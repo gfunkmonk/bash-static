@@ -1,0 +1,556 @@
+From adb0ad3d9a4bd05838042668474950b3e0fcf04d Mon Sep 17 00:00:00 2001
+From: oficsu <oficsu@gmail.com>
+Date: Fri, 12 Jul 2024 20:00:00 +0300
+Subject: [PATCH] make the bash fc builtin more reliable for scripting
+
+This patch adds two new flags for the fc builtin:
+* `-t` makes the output HISTTIMEFORMAT-aware,
+* `-0` separates output by null-terminator
+
+Rationale
+
+It's nearly impossible to parse the bash history for
+interactive usage due to the following trade-offs:
+* you can use `history | tac` at the cost of startup
+  delay when you are working with a large history;
+* you can use `fc -lr` at the cost of datetime info,
+  because the fc lacks support for HISTTIMEFORMAT;
+* you can implement your own history parser, but you
+  can't make sure the code follows the behavior of
+  the fc in edge cases
+
+Making it HISTTIMEFORMAT-aware resolves these issues
+
+Secondly, the builtin is not reliable for scripting,
+since it separates history entries by '\n', creating
+ambiguity between the separators and history entries
+themselves, which can also contain '\n'. Workarounds
+do exist, but why not simply improve the fc?
+
+Modern tools (including GNU) can natively print/read
+output with null-terminated entries. Examples:
+* `xargs -0`,
+* `find -print0`,
+* `comm -z`,
+* `ls --zero`,
+* `fzf --read0`,
+* and many others...
+
+It would be helpful and consistent if the fc builtin
+also had a similar flag
+---
+ Makefile.in          |  3 ++-
+ builtins/Makefile.in | 10 ++++----
+ builtins/fc.def      | 43 ++++++++++++++++++++++++++-------
+ builtins/history.def | 26 ++------------------
+ builtins/histtime.c  | 50 ++++++++++++++++++++++++++++++++++++++
+ builtins/histtime.h  | 21 ++++++++++++++++
+ tests/builtins.right |  4 ++--
+ tests/history.right  | 41 ++++++++++++++++++++++++++++++-
+ tests/history.tests  |  1 +
+ tests/history10.sub  | 57 ++++++++++++++++++++++++++++++++++++++++++++
+ 10 files changed, 216 insertions(+), 40 deletions(-)
+ create mode 100644 builtins/histtime.c
+ create mode 100644 builtins/histtime.h
+ create mode 100644 tests/history10.sub
+
+diff --git a/Makefile.in b/Makefile.in
+index c4a882f7..5967bc64 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -559,7 +559,7 @@ BUILTIN_DEFS = $(DEFSRC)/alias.def $(DEFSRC)/bind.def $(DEFSRC)/break.def \
+ BUILTIN_C_SRC  = $(DEFSRC)/mkbuiltins.c $(DEFSRC)/common.c \
+ 		 $(DEFSRC)/evalstring.c $(DEFSRC)/evalfile.c \
+ 		 $(DEFSRC)/bashgetopt.c $(GETOPT_SOURCE)
+-BUILTIN_C_OBJ  = $(DEFDIR)/common.o $(DEFDIR)/evalstring.o \
++BUILTIN_C_OBJ  = $(DEFDIR)/common.o $(DEFDIR)/histtime.o $(DEFDIR)/evalstring.o \
+ 		 $(DEFDIR)/evalfile.o $(DEFDIR)/bashgetopt.o
+ BUILTIN_OBJS = $(DEFDIR)/alias.o $(DEFDIR)/bind.o $(DEFDIR)/break.o \
+ 	       $(DEFDIR)/builtin.o $(DEFDIR)/cd.o $(DEFDIR)/colon.o \
+@@ -1839,6 +1839,7 @@ $(DEFDIR)/break.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/caller.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/cd.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/common.c: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
++$(DEFDIR)/histtime.c: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/complete.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/declare.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ $(DEFDIR)/enable.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+diff --git a/builtins/Makefile.in b/builtins/Makefile.in
+index 7e0ec324..b9a0680b 100644
+--- a/builtins/Makefile.in
++++ b/builtins/Makefile.in
+@@ -154,12 +154,12 @@ DEFSRC =  $(srcdir)/alias.def $(srcdir)/bind.def $(srcdir)/break.def \
+ 	  $(srcdir)/reserved.def $(srcdir)/pushd.def $(srcdir)/shopt.def \
+ 	  $(srcdir)/printf.def $(srcdir)/complete.def $(srcdir)/mapfile.def
+ 
+-STATIC_SOURCE = common.c evalstring.c evalfile.c getopt.c bashgetopt.c \
++STATIC_SOURCE = common.c histtime.c evalstring.c evalfile.c getopt.c bashgetopt.c \
+ 		getopt.h 
+ 
+ OFILES = builtins.o \
+ 	alias.o bind.o break.o builtin.o caller.o cd.o colon.o command.o \
+-	common.o declare.o echo.o enable.o eval.o evalfile.o \
++	common.o histtime.o declare.o echo.o enable.o eval.o evalfile.o \
+ 	evalstring.o exec.o exit.o fc.o fg_bg.o hash.o help.o history.o \
+ 	jobs.o kill.o let.o mapfile.o \
+ 	pushd.o read.o return.o set.o setattr.o shift.o source.o \
+@@ -237,6 +237,7 @@ mkbuiltins$(EXEEXT): mkbuiltins.o
+ mkbuiltins.o: mkbuiltins.c
+ builtins.o: builtins.c
+ common.o: common.c
++histtime.o: histtime.c
+ bashgetopt.o: bashgetopt.c
+ getopt.o: getopt.c
+ evalstring.o: evalstring.c          
+@@ -484,7 +485,7 @@ exit.o: $(BASHINCDIR)/maxpath.h ./builtext.h ../pathnames.h
+ exit.o: $(BASHINCDIR)/unlocked-io.h
+ fc.o: $(topdir)/bashtypes.h $(BASHINCDIR)/posixstat.h
+ fc.o: $(topdir)/builtins.h $(topdir)/command.h $(srcdir)/bashgetopt.h
+-fc.o: $(topdir)/bashhist.h $(topdir)/parser.h
++fc.o: $(topdir)/bashhist.h $(topdir)/parser.h $(srcdir)/histtime.h
+ fc.o: $(topdir)/command.h ../config.h $(BASHINCDIR)/memalloc.h $(topdir)/error.h
+ fc.o: $(topdir)/general.h $(topdir)/xmalloc.h $(BASHINCDIR)/maxpath.h
+ fc.o: $(topdir)/quit.h $(topdir)/dispose_cmd.h $(topdir)/make_cmd.h $(topdir)/sig.h
+@@ -527,7 +528,7 @@ help.o: $(BASHINCDIR)/unlocked-io.h
+ history.o: $(topdir)/bashtypes.h
+ history.o: $(topdir)/command.h ../config.h $(BASHINCDIR)/memalloc.h
+ history.o: $(topdir)/error.h $(topdir)/general.h $(topdir)/xmalloc.h
+-history.o: $(topdir)/quit.h $(topdir)/dispose_cmd.h $(topdir)/make_cmd.h
++history.o: $(topdir)/quit.h $(topdir)/dispose_cmd.h $(topdir)/make_cmd.h $(srcdir)/histtime.h
+ history.o: $(topdir)/subst.h $(topdir)/externs.h $(topdir)/sig.h  $(topdir)/parser.h
+ history.o: ${BASHINCDIR}/filecntl.h $(topdir)/shell.h $(topdir)/syntax.h $(topdir)/unwind_prot.h
+ history.o: $(topdir)/variables.h $(topdir)/conftypes.h $(topdir)/bashhist.h $(BASHINCDIR)/maxpath.h
+@@ -730,6 +731,7 @@ break.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ caller.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ cd.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ common.c: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
++histtime.c: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ complete.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ declare.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+ enable.o: ${topdir}/bashintl.h ${LIBINTL_H} $(BASHINCDIR)/gettext.h
+diff --git a/builtins/fc.def b/builtins/fc.def
+index 1d88a49a..85429c6c 100644
+--- a/builtins/fc.def
++++ b/builtins/fc.def
+@@ -23,7 +23,7 @@ $PRODUCES fc.c
+ $BUILTIN fc
+ $FUNCTION fc_builtin
+ $DEPENDS_ON HISTORY
+-$SHORT_DOC fc [-e ename] [-lnr] [first] [last] or fc -s [pat=rep] [command]
++$SHORT_DOC fc [-e ename] [-l0ntr] [first] [last] or fc -s [pat=rep] [command]
+ Display or execute commands from the history list.
+ 
+ fc is used to list or edit and re-execute commands from the history list.
+@@ -35,7 +35,9 @@ Options:
+   -e ENAME	select which editor to use.  Default is FCEDIT, then EDITOR,
+ 		then vi
+   -l 	list lines instead of editing
++  -0	set command delimiter to '\0'
+   -n	omit line numbers when listing
++  -t	print command timestamps
+   -r	reverse the order of the lines (newest listed first)
+ 
+ With the `fc -s [pat=rep ...] [command]' format, COMMAND is
+@@ -83,6 +85,7 @@ $END
+ #include <readline/history.h>
+ #include "bashgetopt.h"
+ #include "common.h"
++#include "histtime.h"
+ 
+ #if !defined (errno)
+ extern int errno;
+@@ -113,7 +116,7 @@ extern int suppress_debug_trap_verbose;
+ /* fc builtin command (fix command) for Bash for those who
+    like K*rn-style history better than csh-style.
+ 
+-     fc [-e ename] [-nlr] [first] [last]
++     fc [-e ename] [-ntl0r] [first] [last]
+ 
+    FIRST and LAST can be numbers specifying the range, or FIRST can be
+    a string, which means the most recent command beginning with that
+@@ -124,7 +127,9 @@ extern int suppress_debug_trap_verbose;
+       mode, then vi.
+ 
+    -l means list lines instead of editing.
++   -0 means set command delimiter to '\0'.
+    -n means no line numbers listed.
++   -t means print command timestamps.
+    -r means reverse the order of the lines (making it newest listed first).
+ 
+      fc -e - [pat=rep ...] [command]
+@@ -193,23 +198,23 @@ fc_builtin (WORD_LIST *list)
+ {
+   register int i;
+   register char *sep;
+-  int numbering, reverse, listing, execute;
++  int numbering, timestamp, reverse, listing, zero, execute;
+   int histbeg, histend, last_hist, retval, opt, rh, real_last;
+   FILE *stream;
+   REPL *rlist, *rl;
+-  char *ename, *command, *newcom, *fcedit;
++  char *ename, *command, *newcom, *fcedit, *histtimefmt, *timestr;
+   HIST_ENTRY **hlist;
+   char *fn;
+ 
+   numbering = 1;
+-  reverse = listing = execute = 0;
++  timestamp = reverse = listing = zero = execute = 0;
+   ename = (char *)NULL;
+ 
+   /* Parse out the options and set which of the two forms we're in. */
+   reset_internal_getopt ();
+   lcurrent = list;		/* XXX */
+   while (fc_number (loptend = lcurrent) == 0 &&
+-	 (opt = internal_getopt (list, ":e:lnrs")) != -1)
++	 (opt = internal_getopt (list, ":e:l0ntrs")) != -1)
+     {
+       switch (opt)
+ 	{
+@@ -229,6 +234,14 @@ fc_builtin (WORD_LIST *list)
+ 	  execute = 1;
+ 	  break;
+ 
++	case '0':
++	  zero = 1;
++	  break;
++
++	case 't':
++	  timestamp = 1;
++	  break;
++
+ 	case 'e':
+ 	  ename = list_optarg;
+ 	  break;
+@@ -465,6 +478,8 @@ fc_builtin (WORD_LIST *list)
+ 	}
+     }
+ 
++  histtimefmt = get_string_value ("HISTTIMEFORMAT");
++
+   for (i = reverse ? histend : histbeg; reverse ? i >= histbeg : i <= histend; reverse ? i-- : i++)
+     {
+       QUIT;
+@@ -472,15 +487,27 @@ fc_builtin (WORD_LIST *list)
+ 	continue;
+       if (numbering)
+ 	fprintf (stream, "%d", i + history_base);
+-      if (listing)
++      if (listing && (!zero || numbering))
+ 	{
+ 	  if (posixly_correct)
+ 	    fputs ("\t", stream);
+ 	  else
+ 	    fprintf (stream, "\t%c", histdata (i) ? '*' : ' ');
+ 	}
++      if (timestamp)
++	{
++	  timestr = (histtimefmt && *histtimefmt) ? builtin_histtime (hlist[i], histtimefmt) : (char *)NULL;
++	  timestr = ((timestr && *timestr) ? timestr : "");
++	  fputs (timestr, stream);
++	}
+       if (histline (i))
+-	fprintf (stream, "%s\n", histline (i));
++	{
++	  fputs (histline (i), stream);
++	  if (zero)
++	    fputc ('\0', stream);
++	  else
++	    fputc ('\n', stream);
++	}
+     }
+ 
+   if (listing)
+diff --git a/builtins/history.def b/builtins/history.def
+index 4c36416c..ca29e362 100644
+--- a/builtins/history.def
++++ b/builtins/history.def
+@@ -87,6 +87,7 @@ $END
+ #include <readline/history.h>
+ #include "bashgetopt.h"
+ #include "common.h"
++#include "histtime.h"
+ 
+ #if !defined (errno)
+ extern int errno;
+@@ -106,10 +107,6 @@ static int expand_and_print_history (WORD_LIST *);
+ #define CFLAG	0x40
+ #define DFLAG	0x80
+ 
+-#ifndef TIMELEN_MAX
+-#  define TIMELEN_MAX 128
+-#endif
+-
+ int
+ history_builtin (WORD_LIST *list)
+ {
+@@ -347,25 +344,6 @@ history_builtin (WORD_LIST *list)
+ #define histline(i) (hlist[(i)]->line)
+ #define histdata(i) (hlist[(i)]->data)
+ 
+-static char *
+-histtime (HIST_ENTRY *hlist, const char *histtimefmt)
+-{
+-  static char timestr[TIMELEN_MAX];
+-  time_t t;
+-  struct tm *tm;
+-
+-  t = history_get_time (hlist);
+-  tm = t ? localtime (&t) : 0;
+-  if (t && tm)
+-    strftime (timestr, sizeof (timestr), histtimefmt, tm);
+-  else if (hlist->timestamp && hlist->timestamp[0])
+-    snprintf (timestr, sizeof (timestr), _("%s: invalid timestamp"),
+-	(hlist->timestamp[0] == '#') ? hlist->timestamp + 1: hlist->timestamp);
+-  else
+-    strcpy (timestr, "??");
+-  return timestr;
+-}
+-
+ static int
+ display_history (WORD_LIST *list)
+ {
+@@ -403,7 +381,7 @@ display_history (WORD_LIST *list)
+ 	{
+ 	  QUIT;
+ 
+-	  timestr = (histtimefmt && *histtimefmt) ? histtime (hlist[i], histtimefmt) : (char *)NULL;
++	  timestr = (histtimefmt && *histtimefmt) ? builtin_histtime (hlist[i], histtimefmt) : (char *)NULL;
+ 	  printf ("%5d%c %s%s\n", i + history_base,
+ 		  histdata(i) ? '*' : ' ',
+ 		  ((timestr && *timestr) ? timestr : ""),
+diff --git a/builtins/histtime.c b/builtins/histtime.c
+new file mode 100644
+index 00000000..e2a5ede3
+--- /dev/null
++++ b/builtins/histtime.c
+@@ -0,0 +1,50 @@
++/* histtime.c - a utility for history builtins */
++
++/* Copyright (C) 2025 Free Software Foundation, Inc.
++
++   This file is part of GNU Bash, the Bourne Again SHell.
++
++   Bash is free software: you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation, either version 3 of the License, or
++   (at your option) any later version.
++
++   Bash is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with Bash.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++#include <config.h>
++
++#include <stdio.h>
++#include <string.h>
++
++#include "../bashintl.h"
++#include <readline/history.h>
++
++#ifndef TIMELEN_MAX
++#  define TIMELEN_MAX 128
++#endif
++
++char *
++builtin_histtime (HIST_ENTRY *hlist, const char *histtimefmt)
++{
++  static char timestr[TIMELEN_MAX];
++  time_t t;
++  struct tm *tm;
++
++  t = history_get_time (hlist);
++  tm = t ? localtime (&t) : 0;
++  if (t && tm)
++    strftime (timestr, sizeof (timestr), histtimefmt, tm);
++  else if (hlist->timestamp && hlist->timestamp[0])
++    snprintf (timestr, sizeof (timestr), _("%s: invalid timestamp"),
++        (hlist->timestamp[0] == '#') ? hlist->timestamp + 1: hlist->timestamp);
++  else
++    strcpy (timestr, "??");
++  return timestr;
++}
+diff --git a/builtins/histtime.h b/builtins/histtime.h
+new file mode 100644
+index 00000000..5a6e3b30
+--- /dev/null
++++ b/builtins/histtime.h
+@@ -0,0 +1,21 @@
++/* histtime.h -- extern declarations for functions defined in histtime.c. */
++
++/* Copyright (C) 2025 Free Software Foundation, Inc.
++
++   This file is part of GNU Bash, the Bourne Again SHell.
++
++   Bash is free software: you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation, either version 3 of the License, or
++   (at your option) any later version.
++
++   Bash is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with Bash.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++extern char *builtin_histtime (HIST_ENTRY *, const char *);
+diff --git a/tests/builtins.right b/tests/builtins.right
+index d708c188..b052af06 100644
+--- a/tests/builtins.right
++++ b/tests/builtins.right
+@@ -373,7 +373,7 @@ A star (*) next to a name means that the command is disabled.
+  exit [n]                                typeset [-aAfFgiIlnrtux] name[=value>
+  export [-fn] [name[=value] ...] or ex>  ulimit [-SHabcdefiklmnpqrstuvxPRT] [>
+  false                                   umask [-p] [-S] [mode]
+- fc [-e ename] [-lnr] [first] [last] o>  unalias [-a] name [name ...]
++ fc [-e ename] [-l0ntr] [first] [last]>  unalias [-a] name [name ...]
+  fg [job_spec]                           unset [-f] [-v] [-n] [name ...]
+  for NAME [in WORDS ... ] ; do COMMAND>  until COMMANDS; do COMMANDS-2; done
+  for (( exp1; exp2; exp3 )); do COMMAN>  variables - Names and meanings of so>
+@@ -466,7 +466,7 @@ A star (*) next to a name means that the command is disabled.
+  exit [n]                                typeset [-aAfFgiIlnrtux] name[=value>
+  export [-fn] [name[=value] ...] or ex>  ulimit [-SHabcdefiklmnpqrstuvxPRT] [>
+  false                                   umask [-p] [-S] [mode]
+- fc [-e ename] [-lnr] [first] [last] o>  unalias [-a] name [name ...]
++ fc [-e ename] [-l0ntr] [first] [last]>  unalias [-a] name [name ...]
+  fg [job_spec]                           unset [-f] [-v] [-n] [name ...]
+  for NAME [in WORDS ... ] ; do COMMAND>  until COMMANDS; do COMMANDS-2; done
+  for (( exp1; exp2; exp3 )); do COMMAN>  variables - Names and meanings of so>
+diff --git a/tests/history.right b/tests/history.right
+index 5e1ab36b..fa5a9040 100644
+--- a/tests/history.right
++++ b/tests/history.right
+@@ -2,7 +2,7 @@
+ history: usage: history [-c] [-d offset] [n] or history -anrw [filename] or history -ps arg [arg...]
+ ./history.tests: line 19: history: cannot use more than one of -anrw
+ ./history.tests: line 22: fc: -v: invalid option
+-fc: usage: fc [-e ename] [-lnr] [first] [last] or fc -s [pat=rep] [command]
++fc: usage: fc [-e ename] [-l0ntr] [first] [last] or fc -s [pat=rep] [command]
+     1  for i in one two three; do echo $i; done
+     2  /bin/sh -c 'echo this is $0'
+     3  ls
+@@ -394,3 +394,42 @@ EOF
+ 
+ 
+     5  echo three
++testting numbered + null-terminated...
++3	 echo -e 'x3
++x4
++x5
++' >/dev/null @null-terminator@
++2	 echo x2 >/dev/null @null-terminator@
++1	 echo x1 >/dev/null @null-terminator@
++
++testing null-terminated...
++echo -e 'x3
++x4
++x5
++' >/dev/null @null-terminator@
++echo x2 >/dev/null @null-terminator@
++echo x1 >/dev/null @null-terminator@
++
++testing numbered + timestamps + null-terminated...
++3	 [prefix +0000]	echo -e 'x3
++x4
++x5
++' >/dev/null @null-terminator@
++2	 [prefix +0000]	echo x2 >/dev/null @null-terminator@
++1	 [prefix +0000]	echo x1 >/dev/null @null-terminator@
++
++testing numbered + timestamps...
++3	 [prefix +0000]	echo -e 'x3
++x4
++x5
++' >/dev/null
++2	 [prefix +0000]	echo x2 >/dev/null
++1	 [prefix +0000]	echo x1 >/dev/null
++
++testing timestamps...
++	 [prefix +0000]	echo -e 'x3
++x4
++x5
++' >/dev/null
++	 [prefix +0000]	echo x2 >/dev/null
++	 [prefix +0000]	echo x1 >/dev/null
+diff --git a/tests/history.tests b/tests/history.tests
+index fd3f65aa..58ba13ba 100644
+--- a/tests/history.tests
++++ b/tests/history.tests
+@@ -135,3 +135,4 @@ ${THIS_SH} ./history6.sub
+ ${THIS_SH} ./history7.sub
+ ${THIS_SH} ./history8.sub
+ ${THIS_SH} ./history9.sub
++${THIS_SH} ./history10.sub
+diff --git a/tests/history10.sub b/tests/history10.sub
+new file mode 100644
+index 00000000..536d9918
+--- /dev/null
++++ b/tests/history10.sub
+@@ -0,0 +1,57 @@
++#   This program is free software: you can redistribute it and/or modify
++#   it under the terms of the GNU General Public License as published by
++#   the Free Software Foundation, either version 3 of the License, or
++#   (at your option) any later version.
++#
++#   This program is distributed in the hope that it will be useful,
++#   but WITHOUT ANY WARRANTY; without even the implied warranty of
++#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++#   GNU General Public License for more details.
++#
++#   You should have received a copy of the GNU General Public License
++#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++#
++trap 'rm -f $HISTFILE' 0 1 2 3 6 15
++
++unset HISTIGNORE
++
++HISTFILE=$TMPDIR/foohist-$$
++
++# won't change
++export TZ=UTC
++HISTTIMEFORMAT=$'[prefix %z]\t'
++
++HISTCONTROL=ignorespace
++
++format-output() {
++  sed 's/\o0/ @null-terminator@\n/g'
++}
++
++set -o history
++
++echo x1 >/dev/null
++echo x2 >/dev/null
++
++echo -e 'x3
++x4
++x5
++' >/dev/null
++
++ echo testting numbered + null-terminated...
++ builtin fc -l0r | format-output
++
++ echo
++ echo testing null-terminated...
++ builtin fc -l0nr | format-output
++
++ echo
++ echo testing numbered + timestamps + null-terminated...
++ builtin fc -l0tr | format-output
++
++ echo
++ echo testing numbered + timestamps...
++ builtin fc -ltr | format-output
++
++ echo
++ echo testing timestamps...
++ builtin fc -lntr | format-output
+-- 
+2.50.0
+

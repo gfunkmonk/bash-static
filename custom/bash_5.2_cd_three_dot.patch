@@ -1,0 +1,10 @@
++++ builtins/cd.def	2023-05-17 11:57:46.148180535 +0530
+@@ -328,6 +328,8 @@
+ 	  return (EXECUTION_FAILURE);
+ 	}
+       lflag = 0;
++    } else if (strcmp(list->word->word, "...") == 0){
++      dirname = "../../";
+     }
+ #if defined (CD_COMPLAINS)
+   else if (list->next)

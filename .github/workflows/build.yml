@@ -3,6 +3,7 @@ name: build
 on:
   - push
   - pull_request
+  - workflow_dispatch
 
 jobs:
   build:
@@ -13,19 +14,19 @@ jobs:
           - os: ubuntu-latest
             target: linux
             arch: x86_64
-          - os: macos-latest
+          - os: macos-15-intel
             target: macos
             arch: x86_64
-          - os: macos-latest
+          - os: macos-15
             target: macos
             arch: aarch64
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: install apt packages
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -qq build-essential gpg
+        sudo apt-get install -qq build-essential gpg upx
     - name: install msys2 packages
       if: ${{ matrix.os == 'windows-latest' }}
       uses: msys2/setup-msys2@v2
@@ -36,19 +37,48 @@ jobs:
           git
           gnupg
     - name: install homebrew packages
-      if: ${{ matrix.os == 'macos-latest' }}
+      if: ${{ matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' }}
       run: |
-        brew install gnupg autoconf
+        brew install gnupg autoconf bash upx
     - name: fix macos gpg
-      if: ${{ matrix.os == 'macos-latest' }}
+      if: ${{ matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' }}
+      #run: |
+      #  mkdir -p ~/.gnupg/
+      #  touch ~/.gnupg/dirmngr.conf
+      #  echo "standard-resolver" > ~/.gnupg/dirmngr.conf
       run: |
         mkdir -p ~/.gnupg/
-        touch ~/.gnupg/dirmngr.conf
-        echo "standard-resolver" > ~/.gnupg/dirmngr.conf
+        chmod 700 ~/.gnupg/
+        cat > ~/.gnupg/dirmngr.conf << EOF
+        standard-resolver
+        disable-ipv6
+        keyserver hkps://keys.openpgp.org
+        keyserver hkps://keyserver.ubuntu.com
+        EOF
+        cat > ~/.gnupg/gpg.conf << EOF
+        keyserver hkps://keys.openpgp.org
+        EOF
+        gpgconf --kill dirmngr
+        gpgconf --launch dirmngr
+    #- name: 🔐 🄢🄢🄗 ⒱⒤⒜ 🄒⒧⒪⒰⒟⒡⒧⒜⒭⒠
+    #  uses: valeriangalliat/action-sshd-cloudflared@v1
     - name: build
-      run: ./build.sh ${{matrix.target}} ${{matrix.arch}} && mv -v releases/bash releases/bash-${{matrix.target}}-${{matrix.arch}}
-      shell: bash
-    - uses: actions/upload-artifact@v4  
+      run: |
+        if [ -f /opt/homebrew/bin/bash ]; then
+          BASH_PATH=/opt/homebrew/bin/bash
+        elif [ -f /usr/local/bin/bash ]; then
+          BASH_PATH=/usr/local/bin/bash
+        else
+          BASH_PATH=/usr/bin/bash
+        fi
+        $BASH_PATH -c "./build.sh ${{matrix.target}} ${{matrix.arch}}"
+    - name: rename artifact
+      run: |
+        # Find the actual bash binary (might be bash-5.3-static or similar)
+        cd releases
+        BASH_FILE=$(ls bash* | head -n 1)
+        mv -v "$BASH_FILE" bash-${{matrix.target}}-${{matrix.arch}}
+    - uses: actions/upload-artifact@v6
       with:
         name: bash-${{matrix.target}}-${{matrix.arch}}
         path: releases/bash-${{matrix.target}}-${{matrix.arch}}
@@ -56,10 +86,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [armv6, armv7, aarch64]
+        arch: [armv6, armv7, aarch64, i386]
     steps:
       - uses: actions/checkout@v4
-      - uses: uraimo/run-on-arch-action@v2.8.1
+      - uses: gfunkmonk/run-on-arch-action@master
         id: build
         with:
           arch: ${{ matrix.arch }}
@@ -79,12 +109,16 @@ jobs:
           # no secrets are present in the container state or logs.
           install: |
             apk update
-            apk add alpine-sdk gnupg git bash autoconf bison curl
+            apk add alpine-sdk gnupg git bash autoconf bison curl upx
 
           # Produce a binary artifact and place it in the mounted volume
           run: |
-            cd /data && ./build.sh linux ${{matrix.arch}} && mv -v releases/bash releases/bash-linux-${{matrix.arch}}
-      - uses: actions/upload-artifact@v4  
+            #cd /data && ./build.sh linux ${{matrix.arch}} && mv -v releases/bash releases/bash-linux-${{matrix.arch}}
+            cd /data && ./build.sh linux ${{matrix.arch}}
+            cd releases
+            BASH_FILE=$(ls bash* | head -n 1)
+            mv -v "$BASH_FILE" bash-linux-${{matrix.arch}}
+      - uses: actions/upload-artifact@v6
         with:
           name: bash-linux-${{matrix.arch}}
           path: releases/bash-linux-${{matrix.arch}}
@@ -93,7 +127,7 @@ jobs:
       - build
     runs-on: macos-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           path: artifacts
       - name: make executable
@@ -128,4 +162,3 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      

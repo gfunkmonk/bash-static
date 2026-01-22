@@ -24,8 +24,23 @@
 # For Linux, also builds musl for truly static linking if
 # musl is not installed.
 
-set -euo pipefail
+set -eo pipefail
 shopt -s nullglob
+
+usage () {
+  latest=$(basename --suffix .sh $(readlink version.sh))
+  bv=${latest##version-}
+  cat << __USAGE
+
+  $(basename ${0}) [OS] [ARCH] [TAG]
+
+  Where:
+  OS   -- defaults to $(uname -s)
+  ARCH -- defaults to $(uname -m)
+  TAG  -- defaults to ${bv}
+
+__USAGE
+}
 
 # Silence these
 pushd() { command pushd "$@" >/dev/null; }
@@ -35,18 +50,21 @@ popd() { command popd >/dev/null; }
 # Only pull files that don't already exist
 mycurl() {
   (($# == 2)) || return
-  [[ -f ${1##*/} ]] || { echo "File: ${1##*/} | Url: ${1}" && curl -sLO "$1"; }
+  [[ -f ${1##*/} ]] || { echo "File: ${1##*/} | Url: ${1}" && curl -sSfLO "$1"; }
   [[ -f ${1##*/}.${2} || ${NO_SIGS:-} ]] || {
-    echo "File: ${1##*/}.${2} | Url: ${1}.${2}" && curl -sLO "${1}.${2}"
+    echo "File: ${1##*/}.${2} | Url: ${1}.${2}" && curl -sSfLO "${1}.${2}"
     gpg --trust-model always --verify "${1##*/}.${2}" "${1##*/}" 2>/dev/null
   }
 }
 
 main() {
-  [[ ${1:-} ]] || { echo "! no target specified" >&2 && exit 1; }
-  [[ ${2:-} ]] || { echo "! no arch specified" >&2 && exit 1; }
+  [[ ${1} = '-h' || ${1} = '--help' ]] && usage && exit
 
-  declare -r target=${1} arch=${2} tag=${3:-}
+  #myT=$(uname -s) && dO=${myT@L} && declare -r target=${1:-$dO}
+  #myA=$(uname -m) && dA=${myA@L} && declare -r arch=${2:-$dA}
+  myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]') && declare -r target=${1:-$dO}
+  myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]') && declare -r raw_arch=${2:-$dA}
+  declare -r tag=${3:-}
   declare -r bash_mirror='https://ftp.gnu.org/gnu/bash'
   declare -r musl_mirror='https://musl.libc.org/releases'
 
@@ -62,18 +80,68 @@ main() {
   # pre-prepare gpg for verificaiton
   echo "= preparing gpg"
   export GNUPGHOME=${PWD}/.gnupg
+  # Helper function for robust GPG key import
+  import_gpg_key() {
+    local key=$1
+    local i
+    for i in {1..5}; do
+      gpg --quiet --list-keys "$key" && return 0
+      gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 --recv-keys "$key" && return 0
+      gpg --quiet --keyserver hkps://keys.openpgp.org --recv-keys "$key" && return 0
+      gpg --quiet --keyserver keyserver.ubuntu.com --recv-keys "$key" && return 0
+      gpg --quiet --keyserver keyring.debian.org --recv-keys "$key" && return 0
+      gpg --quiet --keyserver pgp.mit.edu --recv-keys "$key" && return 0
+      gpg --quiet --keyserver 185.125.188.27 --recv-keys "$key" && return 0
+      gpg --quiet --keyserver hkp://ipv4.pool.sks-keyservers.net --recv-keys "$key" && return 0
+      sleep 5
+    done
+    return 1
+  }
+
   # public key for bash
-  gpg --quiet --list-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB ||
-    gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
-      --recv-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB
+  import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || exit 2
   # public key for musl
-  gpg --quiet --list-keys 836489290BB6B70F99FFDA0556BCDB593020450F ||
-    gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
-      --recv-keys 836489290BB6B70F99FFDA0556BCDB593020450F
+  import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || exit 2
+
+  # public key for bash
+  #gpg --quiet --list-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB ||
+  #  gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
+  #    --recv-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB ||
+  #  gpg --quiet --keyserver hkps://keys.openpgp.org \
+  #    --recv-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB
+  # public key for musl
+  #gpg --quiet --list-keys 836489290BB6B70F99FFDA0556BCDB593020450F ||
+  #  gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
+  #    --recv-keys 836489290BB6B70F99FFDA0556BCDB593020450F ||
+  #  gpg --quiet --keyserver hkps://keys.openpgp.org \
+  #    --recv-keys 836489290BB6B70F99FFDA0556BCDB593020450F
 
   # download tarballs
   echo "= downloading bash ${bash_version}"
   mycurl ${bash_mirror}/bash-${bash_version}.tar.gz sig
+
+  echo "= downloading bash ${bash_version}"
+
+  mirror_list=(
+    "https://ftp.gnu.org/gnu/bash"
+    "https://mirrors.ocf.berkeley.edu/gnu/bash"
+    "https://mirrors.kernel.org/gnu/bash"
+    "https://mirrors.ibiblio.org/pub/mirrors/gnu/bash/"
+    "https://mirror.us-midwest-1.nexcess.net/gnu/bash/"
+  )
+
+  for mirror in "${mirror_list[@]}"; do
+    if curl -sSfLO "${mirror}/bash-${bash_version}.tar.gz"; then
+      break
+    fi
+  done
+
+  # Download the signature file from the first successful mirror
+  for mirror in "${mirror_list[@]}"; do
+    if curl -sSfLO "${mirror}/bash-${bash_version}.tar.gz.sig"; then
+      break
+    fi
+  done
 
   echo "= extracting bash ${bash_version}"
   rm -fr bash-${bash_version}
@@ -120,27 +188,70 @@ main() {
       echo "= setting CC to musl-gcc ${musl_version}"
       export CC=${install_dir}/bin/musl-gcc
     fi
-    export CFLAGS="${CFLAGS:-} -Os -static"
+    export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections"
+    #export LDFLAGS="${LDFLAGS:-} -static -Wl,--gc-sections"
+    #export CFLAGS="${CFLAGS:-} -Os -static"
+    export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
+    if [[ $arch == aarch64 ]]; then
+      HOST="${ARCH}-linux-musl"
+      configure_args=("${configure_args[@]}" "--host=aarch64-linux-musl")
+    fi
   else
     echo "= WARNING: your platform does not support static binaries."
     echo "= (This is mainly due to non-static libc availability.)"
+
     if [[ $target == macos ]]; then
       # set minimum version of macOS to 10.13
       export MACOSX_DEPLOYMENT_TARGET="10.13"
-      export CC="clang -std=c89 -Wno-return-type"
-
+      #export CC="clang -std=c89 -Wno-return-type"
+      export MACOS_TARGET="10.13"
+      export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-return-type"
+      export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-return-type"
       # use included gettext to avoid reading from other places, like homebrew
       configure_args=("${configure_args[@]}" "--with-included-gettext")
 
-      # if $arch is aarch64 for mac, target arm64e
+      # if $arch is aarch64 for mac, target arm64
       if [[ $arch == aarch64 ]]; then
-        export CFLAGS="${CFLAGS:-} -Os -target arm64-apple-macos"
+        export CFLAGS="-Os -target arm64-apple-macos"
         configure_args=("${configure_args[@]}" "--host=aarch64-apple-darwin")
-      else
-        export CFLAGS="${CFLAGS:-} -Os -target x86_64-apple-macos10.12"
-        configure_args=("${configure_args[@]}" "--host=x86_64-apple-macos10.12")
+      #else
+      #  export CFLAGS="${CFLAGS:-} -Os -target x86_64-apple-macos10.12"
+      #  configure_args=("${configure_args[@]}" "--host=x86_64-apple-macos10.12")
       fi
     fi
+  fi
+
+
+# Get per-architecture default CFLAGS
+get_arch_cflags() {
+  local arch=$1
+  case "$arch" in
+    aarch64)
+      echo "-march=armv8-a"
+      ;;
+    armv7)
+      echo "-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard"
+      ;;
+    armv6)
+      echo "-march=armv6 -mfpu=vfp -mfloat-abi=soft"
+      ;;
+    x86_64)
+      echo "-march=x86-64 -mtune=generic"
+      ;;
+    i386)
+      echo "-march=i686 -mtune=generic"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+  # Start with architecture-specific defaults
+  arch_cflags=$(get_arch_cflags "$arch")
+
+  if [[ $target == linux ]]; then
+    export CFLAGS="${CFLAGS:-} $arch_cflags"
   fi
 
   echo "= building bash ${bash_version}"
@@ -154,8 +265,12 @@ main() {
   echo "= extracting bash ${bash_version} binary"
   mkdir -p releases
   cp build/bash-${bash_version}/bash releases/bash-${bash_version}-static
-  strip -s releases/bash-${bash_version}-static
+  #if [ "$TARGET" != "macos" ]; then
+  strip -s releases/bash-${bash_version}-static || true
+  #fi
   rm -fr build/bash-${bash_version}
+  echo "= compressing"
+  upx --ultra-brute releases/bash-${bash_version}-static || true
   echo "= done"
 }
 
