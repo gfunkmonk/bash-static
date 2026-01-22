@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [armv6, armv7, aarch64, i386]
+        arch: [armv6, armv7, aarch64, i386, riscv64, ppc64le]
     steps:
       - uses: actions/checkout@v4
       - uses: gfunkmonk/run-on-arch-action@master
