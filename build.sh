@@ -1,28 +1,4 @@
 #!/bin/bash
-#
-# build static bash because we need exercises in minimalism
-# Copyright © 2015 Robert Xu <robxu9@gmail.com>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the “Software”), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-#
-# For Linux, also builds musl for truly static linking if
-# musl is not installed.
 
 set -eo pipefail
 shopt -s nullglob
@@ -103,19 +79,6 @@ main() {
   # public key for musl
   import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || exit 2
 
-  # public key for bash
-  #gpg --quiet --list-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB ||
-  #  gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
-  #    --recv-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB ||
-  #  gpg --quiet --keyserver hkps://keys.openpgp.org \
-  #    --recv-keys 7C0135FB088AAF6C66C650B9BB5869F064EA74AB
-  # public key for musl
-  #gpg --quiet --list-keys 836489290BB6B70F99FFDA0556BCDB593020450F ||
-  #  gpg --quiet --keyserver hkps://keyserver.ubuntu.com:443 \
-  #    --recv-keys 836489290BB6B70F99FFDA0556BCDB593020450F ||
-  #  gpg --quiet --keyserver hkps://keys.openpgp.org \
-  #    --recv-keys 836489290BB6B70F99FFDA0556BCDB593020450F
-
   # download tarballs
   echo "= downloading bash ${bash_version}"
   mycurl ${bash_mirror}/bash-${bash_version}.tar.gz sig
@@ -189,8 +152,6 @@ main() {
       export CC=${install_dir}/bin/musl-gcc
     fi
     export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections"
-    #export LDFLAGS="${LDFLAGS:-} -static -Wl,--gc-sections"
-    #export CFLAGS="${CFLAGS:-} -Os -static"
     export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
     if [[ $arch == aarch64 ]]; then
       HOST="${ARCH}-linux-musl"
@@ -203,7 +164,6 @@ main() {
     if [[ $target == macos ]]; then
       # set minimum version of macOS to 10.13
       export MACOSX_DEPLOYMENT_TARGET="10.13"
-      #export CC="clang -std=c89 -Wno-return-type"
       export MACOS_TARGET="10.13"
       export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-return-type"
       export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-return-type"
@@ -247,6 +207,12 @@ get_arch_cflags() {
   esac
 }
 
+  if [[ $arch == mipsel ]]; then
+    export CFLAGS="-Os -target mipsel-unknown-linux-gnu"
+    export MIPS_HOST="--host=x86_64-pc-linux-musl"
+    configure_args=("${configure_args[@]}" "--host=x86_64-linux-gnu")
+  fi
+
   # Start with architecture-specific defaults
   arch_cflags=$(get_arch_cflags "$arch")
 
@@ -257,7 +223,7 @@ get_arch_cflags() {
   echo "= building bash ${bash_version}"
   pushd bash-${bash_version}
   export CPPFLAGS="${CFLAGS}" # Some versions need both set
-  autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}"
+  autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}" "$MIPS_HOST"
   make -s && make -s tests
   popd # bash-${bash_version}
   popd # build

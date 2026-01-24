@@ -1,9 +1,6 @@
 name: build
 
-on:
-  - push
-  - pull_request
-  - workflow_dispatch
+on: workflow_dispatch
 
 jobs:
   build:
@@ -86,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [armv6, armv7, aarch64, i386, riscv64, ppc64le]
+        arch: [armv6, armv7, aarch64]
     steps:
       - uses: actions/checkout@v4
       - uses: gfunkmonk/run-on-arch-action@master
@@ -122,6 +119,67 @@ jobs:
         with:
           name: bash-linux-${{matrix.arch}}
           path: releases/bash-linux-${{matrix.arch}}
+  mipsel-build:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: [mipsel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gfunkmonk/run-on-arch-action@master
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: alpine_latest
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}:/data"
+          shell: /bin/sh
+          install: |
+            apk update
+            apk add alpine-sdk gnupg git bash autoconf bison curl
+          # Produce a binary artifact and place it in the mounted volume
+          run: |
+            cd /data && MIPS_HOST="--host=x86_64-pc-linux-musl" ./build.sh linux ${{matrix.arch}}
+            cd releases
+            BASH_FILE=$(ls bash* | head -n 1)
+            mv -v "$BASH_FILE" bash-linux-${{matrix.arch}}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-linux-${{matrix.arch}}
+          path: releases/bash-linux-${{matrix.arch}}
+  others-build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [i386, riscv64, ppc64le, s390x]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gfunkmonk/run-on-arch-action@master
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: alpine_latest
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}:/data"
+
+          shell: /bin/sh
+
+          install: |
+            apk update
+            apk add alpine-sdk gnupg git bash autoconf bison curl
+
+          # Produce a binary artifact and place it in the mounted volume
+          run: |
+            cd /data && ./build.sh linux ${{matrix.arch}}
+            cd releases
+            BASH_FILE=$(ls bash* | head -n 1)
+            mv -v "$BASH_FILE" bash-linux-${{matrix.arch}}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-linux-${{matrix.arch}}
+          path: releases/bash-linux-${{matrix.arch}}
   macos-universal:
     needs:
       - build
@@ -142,6 +200,8 @@ jobs:
     needs:
       - build
       - docker-build
+      - mipsel-build
+      - others-build
       - macos-universal
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
