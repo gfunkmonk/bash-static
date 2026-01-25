@@ -85,7 +85,7 @@ jobs:
       matrix:
         arch: [armv6, armv7, aarch64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: gfunkmonk/run-on-arch-action@master
         id: build
         with:
@@ -125,7 +125,7 @@ jobs:
       matrix:
         arch: [mipsel]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: gfunkmonk/run-on-arch-action@master
         id: build
         with:
@@ -154,7 +154,7 @@ jobs:
       matrix:
         arch: [i386, riscv64, ppc64le, s390x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: gfunkmonk/run-on-arch-action@master
         id: build
         with:
@@ -206,7 +206,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: generate changelog
         run: ./changelog.sh
       - uses: actions/download-artifact@v4
