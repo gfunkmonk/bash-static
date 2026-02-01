@@ -1,9 +1,6 @@
 name: build
 
-on:
-  - push
-  - pull_request
-  - workflow_dispatch
+on: workflow_dispatch
 
 jobs:
   build:
@@ -42,10 +39,6 @@ jobs:
         brew install gnupg autoconf bash upx
     - name: fix macos gpg
       if: ${{ matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' }}
-      #run: |
-      #  mkdir -p ~/.gnupg/
-      #  touch ~/.gnupg/dirmngr.conf
-      #  echo "standard-resolver" > ~/.gnupg/dirmngr.conf
       run: |
         mkdir -p ~/.gnupg/
         chmod 700 ~/.gnupg/
@@ -60,8 +53,6 @@ jobs:
         EOF
         gpgconf --kill dirmngr
         gpgconf --launch dirmngr
-    #- name: 🔐 🄢🄢🄗 ⒱⒤⒜ 🄒⒧⒪⒰⒟⒡⒧⒜⒭⒠
-    #  uses: valeriangalliat/action-sshd-cloudflared@v1
     - name: build
       run: |
         if [ -f /opt/homebrew/bin/bash ]; then
@@ -74,7 +65,7 @@ jobs:
         $BASH_PATH -c "./build.sh ${{matrix.target}} ${{matrix.arch}}"
     - name: rename artifact
       run: |
-        # Find the actual bash binary (might be bash-5.3-static or similar)
+        # Find the actual bash binary
         cd releases
         BASH_FILE=$(ls bash* | head -n 1)
         mv -v "$BASH_FILE" bash-${{matrix.target}}-${{matrix.arch}}
@@ -82,13 +73,13 @@ jobs:
       with:
         name: bash-${{matrix.target}}-${{matrix.arch}}
         path: releases/bash-${{matrix.target}}-${{matrix.arch}}
-  docker-build: 
+  docker-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [armv6, armv7, aarch64, i386, riscv64, ppc64le]
+        arch: [armv6, armv7, aarch64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: gfunkmonk/run-on-arch-action@master
         id: build
         with:
@@ -113,7 +104,67 @@ jobs:
 
           # Produce a binary artifact and place it in the mounted volume
           run: |
-            #cd /data && ./build.sh linux ${{matrix.arch}} && mv -v releases/bash releases/bash-linux-${{matrix.arch}}
+            cd /data && ./build.sh linux ${{matrix.arch}}
+            cd releases
+            BASH_FILE=$(ls bash* | head -n 1)
+            mv -v "$BASH_FILE" bash-linux-${{matrix.arch}}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-linux-${{matrix.arch}}
+          path: releases/bash-linux-${{matrix.arch}}
+  misc-build:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: [mipsel, i386]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: gfunkmonk/run-on-arch-action@master
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: alpine_latest
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}:/data"
+          shell: /bin/sh
+          install: |
+            apk update
+            apk add alpine-sdk gnupg git bash autoconf bison curl
+          # Produce a binary artifact and place it in the mounted volume
+          run: |
+            cd /data && ./build.sh linux ${{matrix.arch}}
+            cd releases
+            BASH_FILE=$(ls bash* | head -n 1)
+            mv -v "$BASH_FILE" bash-linux-${{matrix.arch}}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-linux-${{matrix.arch}}
+          path: releases/bash-linux-${{matrix.arch}}
+  others-build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [riscv64, ppc64le, s390x]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: gfunkmonk/run-on-arch-action@master
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: alpine_latest
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}:/data"
+
+          shell: /bin/sh
+
+          install: |
+            apk update
+            apk add alpine-sdk gnupg git bash autoconf bison curl
+
+          # Produce a binary artifact and place it in the mounted volume
+          run: |
             cd /data && ./build.sh linux ${{matrix.arch}}
             cd releases
             BASH_FILE=$(ls bash* | head -n 1)
@@ -127,14 +178,14 @@ jobs:
       - build
     runs-on: macos-latest
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
       - name: make executable
         run: chmod +x artifacts/*/* && ls -al && ls -al artifacts/
       - name: run lipo to create universal binary
         run: lipo -create -arch arm64 artifacts/bash-macos-aarch64/bash-macos-aarch64 -arch x86_64 artifacts/bash-macos-x86_64/bash-macos-x86_64 -output bash-macos-universal
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: bash-macos-universal
           path: bash-macos-universal
@@ -142,14 +193,16 @@ jobs:
     needs:
       - build
       - docker-build
+      - misc-build
+      - others-build
       - macos-universal
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: generate changelog
         run: ./changelog.sh
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
       - name: make executable
