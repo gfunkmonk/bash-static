@@ -7,12 +7,17 @@ usage() {
     latest=$(basename --suffix .sh "$(readlink version.sh 2>/dev/null || echo "version.sh")")
     bv=${latest##version-}
     cat << __USAGE
-$(basename "${0}") [OS] [ARCH] [TAG]
+$(basename "${0}") [OPTIONS] [OS] [ARCH] [TAG]
 
 Where:
   OS   -- defaults to $(uname -s | tr '[:upper:]' '[:lower:]')
   ARCH -- defaults to $(uname -m | tr '[:upper:]' '[:lower:]')
   TAG  -- defaults to ${bv}
+
+Options (also available via env vars shown in brackets):
+  --dl-toolchain      Use prebuilt musl cross-compiler toolchain from github [DL_TOOLCHAIN]
+  --nosig             Skip GPG signature verification (not recommended) [NOSIG]
+  --extra-cflags VAL  Additional compiler flags to append to default CFLAGS [EXTRA_CFLAGS]
 
 Environment variables:
   DL_TOOLCHAIN       -- Use prebuilt musl cross-compiler toolchain from github
@@ -306,15 +311,54 @@ setup_musl_toolchain() {
 }
 
 main() {
-    [[ ${1} = '-h' || ${1} = '--help' || ${1} = 'help' ]] && usage && exit 0
-    [[ ${1} = 'clean' ]] && rm -fr build/ && rm -fr releases/ && echo -e "${ORANGE} Cleaned build/ and releases/ !!" && exit 0
+    parsed_args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help|help)
+                usage
+                exit 0
+                ;;
+            --dl-toolchain)
+                DL_TOOLCHAIN=1
+                shift
+                ;;
+            --nosig)
+                NOSIG=1
+                shift
+                ;;
+            --extra-cflags)
+                EXTRA_CFLAGS=${2:-}
+                [[ -z ${EXTRA_CFLAGS} ]] && { echo -e "${RED}ERROR: --extra-cflags requires a value${NC}" >&2; exit 1; }
+                shift 2
+                ;;
+            --extra-cflags=*)
+                EXTRA_CFLAGS=${1#*=}
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                parsed_args+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    # Append any remaining args after -- to positional list
+    if [[ $# -gt 0 ]]; then
+        parsed_args+=("$@")
+    fi
+
+    [[ ${parsed_args[0]:-} = 'clean' ]] && rm -fr build/ && rm -fr releases/ && echo -e "${ORANGE} Cleaned build/ and releases/ !!" && exit 0
 
     myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]')
     myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]')
 
-    declare -r target=${1:-$dO}
-    declare -r arch=$(normalize_arch "${2:-$dA}")
-    declare -r tag=${3:-}
+    declare -r target=${parsed_args[0]:-$dO}
+    declare -r arch=$(normalize_arch "${parsed_args[1]:-$dA}")
+    declare -r tag=${parsed_args[2]:-}
     declare -r musl_mirror='https://musl.libc.org/releases'
 
     echo -e "${BWHITE}Building for: ${VIOLET}OS=${target}, ${TOMATO}ARCH=${arch}${NC}"
