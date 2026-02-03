@@ -26,7 +26,7 @@ __USAGE
 
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/02032026"
 
-# Color definitions
+# Color definitions (only colors that are actually used)
 NC="\033[0m"
 RED="\033[1;31m"
 GREEN="\033[1;32m"
@@ -35,15 +35,12 @@ BLUE="\033[1;34m"
 PURPLE="\033[1;35m"
 CYAN="\033[1;36m"
 BROWN="\033[0;33m"
-TEAL="\033[2;36m"
 BWHITE="\033[1;37m"
 DKPURPLE="\033[0;35m"
-WHITE="\033[0;37m"
 LIME="\033[38;2;204;255;0m"
 JUNEBUD="\033[38;2;189;218;87m"
 CORAL="\033[38;2;255;127;80m"
-PINK="\033[38;2;255;45;192m"
-HOTPINK="\033[38;2;255;105;180m"
+PINK="\033[38;2;255;105;180m"
 ORANGE="\033[38;2;255;165;0m"
 PEACH="\033[38;2;246;161;146m"
 GOLD="\033[38;2;255;215;0m"
@@ -58,13 +55,11 @@ HELIOTROPE="\033[38;2;223;115;255m"
 SLATE="\033[38;2;109;129;150m"
 LAGOON="\033[38;2;142;235;236m"
 PLUM="\033[38;2;142;69;133m"
-VIOLET="\033[38;2;143;0;255m"
 LIGHTROYAL="\033[38;2;10;148;255m"
 TURQUOISE="\033[38;2;64;224;208m"
 MINT="\033[38;2;152;255;152m"
 AQUA="\033[38;2;18;254;202m"
 SKY="\033[38;2;135;206;250m"
-TOMATO="\033[38;2;255;99;71m"
 CREAM="\033[38;2;255;253;208m"
 REBECCA="\033[38;2;102;51;153m"
 
@@ -114,10 +109,10 @@ mycurl() {
         fi
 
         # Verify signature
-    echo -e "${DKPURPLE}Verifying signature: ${filename}${NC}"
-    gpg --trust-model always --verify "${filename}.${sig_ext}" "${filename}" 2>/dev/null || {
-        echo -e "${CRIMSON}ERROR: GPG verification failed for ${filename}${NC}" >&2
-        return 1
+        echo -e "${DKPURPLE}Verifying signature: ${filename}${NC}"
+        gpg --trust-model always --verify "${filename}.${sig_ext}" "${filename}" 2>/dev/null || {
+            echo -e "${CRIMSON}ERROR: GPG verification failed for ${filename}${NC}" >&2
+            return 1
         }
         echo -e "${GREEN}Signature verified for ${filename}"
     else
@@ -233,15 +228,8 @@ get_musl_toolchain() {
         s390x) echo "s390x-ibm-linux-musl" ;;
         sh4) echo "sh4-multilib-linux-musl" ;;
         x86_64) echo "x86_64-linux-musl" ;;
-       *) echo "" ;;
+        *) echo "" ;;
     esac
-}
-
-# Get host triplet for cross-compilation
-get_host_triplet() {
-    local arch=$1
-    local toolchain_name=$(get_musl_toolchain "$arch")
-    echo "$toolchain_name"
 }
 
 # Download and setup musl prebuilt toolchain
@@ -282,9 +270,9 @@ setup_musl_toolchain() {
 
     # Extract based on archive type (silent extraction)
     tar -xJf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
-    echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
+        echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
         rm -rf "$toolchain_dir" "$archive_name"
-    return 1
+        return 1
     }
 
     # Verify the compiler exists
@@ -305,6 +293,33 @@ setup_musl_toolchain() {
     return 0
 }
 
+# Build musl from source and set CC
+# Expects configure_args array and musl_mirror/musl_version to be set
+build_musl_from_source() {
+    local install_dir=${PWD}/musl-install-${musl_version}
+
+    if [[ -f ${install_dir}/bin/musl-gcc ]]; then
+        echo -e "${LAGOON}= Reusing existing musl ${musl_version}${NC}"
+    else
+        echo -e "${CANARY}= Downloading musl ${musl_version}${NC}"
+        mycurl "${musl_mirror}/musl-${musl_version}.tar.gz" asc
+
+        echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
+        rm -rf "musl-${musl_version}"
+        tar -xf "musl-${musl_version}.tar.gz"
+
+        echo -e "${CORAL}= Building musl ${musl_version}${NC}"
+        pushd "musl-${musl_version}"
+        ./configure --prefix="${install_dir}" "${configure_args[@]}"
+        make -j"$(nproc)" -s install
+        popd # musl-${musl_version}
+        rm -rf "musl-${musl_version}"
+    fi
+
+    echo -e "${BWHITE}= Setting CC to musl-gcc ${musl_version}${NC}"
+    export CC="${install_dir}/bin/musl-gcc"
+}
+
 main() {
     [[ ${1} = '-h' || ${1} = '--help' || ${1} = 'help' ]] && usage && exit 0
     [[ ${1} = 'clean' ]] && rm -fr build/ && rm -fr releases/ && echo -e "${ORANGE} Cleaned build/ and releases/ !!" && exit 0
@@ -317,7 +332,7 @@ main() {
     declare -r tag=${3:-}
     declare -r musl_mirror='https://musl.libc.org/releases'
 
-    echo -e "${BWHITE}Building for: ${VIOLET}OS=${target}, ${TOMATO}ARCH=${arch}${NC}"
+    echo -e "${BWHITE}Building for: ${PURPLE}OS=${target}, ${RED}ARCH=${arch}${NC}"
 
     # Ensure we are in the project root
     pushd "${0%/*}"
@@ -343,14 +358,14 @@ main() {
 
     # Prepare GPG for verification (skip if NOSIG is set)
     if [[ ! ${NOSIG:-} ]]; then
-    echo -e "${LEMON}= Preparing GPG${NC}"
-    export GNUPGHOME=${PWD}/.gnupg
-    mkdir -p "$GNUPGHOME"
-    chmod 700 "$GNUPGHOME"
+        echo -e "${LEMON}= Preparing GPG${NC}"
+        export GNUPGHOME=${PWD}/.gnupg
+        mkdir -p "$GNUPGHOME"
+        chmod 700 "$GNUPGHOME"
 
-    # Import public keys
-    import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || exit 2  # bash
-    import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || exit 2  # musl
+        # Import public keys
+        import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || exit 2  # bash
+        import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || exit 2  # musl
     else
         echo -e "${YELLOW}WARNING: Skipping GPG setup (NOSIG is set)${NC}" >&2
     fi
@@ -380,7 +395,7 @@ main() {
     fi
 
     # Extract bash
-    echo -e "${HOTPINK}= Extracting bash ${bash_version}${NC}"
+    echo -e "${PINK}= Extracting bash ${bash_version}${NC}"
     rm -rf bash-"${bash_version}"
     tar -xf "bash-${bash_version}.tar.gz"
 
@@ -440,57 +455,17 @@ main() {
                 echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
 
                 # Set host argument for cross-compilation
-                host_arg="--host=$(get_host_triplet "$arch")"
+                host_arg="--host=$(get_musl_toolchain "$arch")"
 
                 # Add -std=gnu17 for musl toolchain compatibility
                 export CFLAGS="-std=gnu17 ${CFLAGS:-}"
-        else
-                # Fallback to building musl if toolchain download fails
-                echo -e "${CORAL}= Building musl from source${NC}"
-                install_dir=${PWD}/musl-install-${musl_version}
-            if [[ -f ${install_dir}/bin/musl-gcc ]]; then
-                echo -e "${LAGOON}= Reusing existing musl ${musl_version}${NC}"
             else
-                echo -e "${CANARY}= Downloading musl ${musl_version}${NC}"
-                mycurl ${musl_mirror}/musl-"${musl_version}".tar.gz asc
-
-                echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
-                rm -rf musl-"${musl_version}"
-                tar -xf musl-"${musl_version}".tar.gz
-
-                echo -e "${CORAL}= Building musl ${musl_version}${NC}"
-                pushd musl-"${musl_version}"
-                ./configure --prefix="${install_dir}" "${configure_args[@]}"
-                make -j"$(nproc)" -s install
-                popd # musl-${musl_version}
-                rm -rf musl-"${musl_version}"
-            fi
-                echo -e "${BWHITE}= Setting CC to musl-gcc ${musl_version}${NC}"
-                export CC=${install_dir}/bin/musl-gcc
+                # Fallback to building musl if toolchain download fails
+                build_musl_from_source
             fi
         else
             # Default: build musl from source
-            install_dir=${PWD}/musl-install-${musl_version}
-            if [[ -f ${install_dir}/bin/musl-gcc ]]; then
-                echo -e "${LAGOON}= Reusing existing musl ${musl_version}${NC}"
-            else
-                echo -e "${CANARY}= Downloading musl ${musl_version}${NC}"
-                mycurl ${musl_mirror}/musl-"${musl_version}".tar.gz asc
-
-                echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
-                rm -rf musl-"${musl_version}"
-                tar -xf musl-"${musl_version}".tar.gz
-
-                echo -e "${CORAL}= Building musl ${musl_version}${NC}"
-                pushd musl-"${musl_version}"
-                ./configure --prefix="${install_dir}" "${configure_args[@]}"
-                make -j"$(nproc)" -s install
-                popd # musl-${musl_version}
-                rm -rf musl-"${musl_version}"
-            fi
-
-            echo -e "${BWHITE}= Setting CC to musl-gcc ${musl_version}${NC}"
-            export CC=${install_dir}/bin/musl-gcc
+            build_musl_from_source
         fi
 
         # Linux-specific flags
@@ -535,7 +510,7 @@ main() {
     fi
 
     echo -e "${BLUE}===========${REBECCA} Configuration: ${BLUE}=============${NC}"
-    echo -e "${TEAL}= Building bash ${bash_version}${NC}"
+    echo -e "${CYAN}= Building bash ${bash_version}${NC}"
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
     echo -e "${TURQUOISE}  LDFLAGS: ${LDFLAGS:-none}${NC}"
     echo -e "${MINT}  Host: ${host_arg:-native}${NC}"
