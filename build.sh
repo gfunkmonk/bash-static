@@ -15,7 +15,7 @@ Where:
   TAG  -- defaults to ${bv}
 
 Environment variables:
-  DL_TOOLCHAIN       -- Use prebuilt musl cross-compiler toolchain from musl.cc
+  DL_TOOLCHAIN       -- Use prebuilt musl cross-compiler toolchain from github
   NOSIG              -- Set to skip GPG signature verification (not recommended)
   EXTRA_CFLAGS       -- Additional compiler flags to append to default CFLAGS
   WITH_TESTS         -- Build with tests
@@ -23,6 +23,8 @@ Environment variables:
   NJOBS              -- Number of parallel jobs (default: auto-detect)
 __USAGE
 }
+
+TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/02032026"
 
 # Color definitions
 NC="\033[0m"
@@ -164,7 +166,7 @@ normalize_arch() {
         arm64|armv8) echo "aarch64" ;;
         armv6l) echo "armv6" ;;
         armv7l) echo "armv7" ;;
-        i686|x32) echo "i386" ;;
+        i386|x32) echo "i686" ;;
         openrisc) echo "or1k" ;;
         ppc) echo "powerpc" ;;
         ppcle) echo "powerpcle" ;;
@@ -185,12 +187,12 @@ get_arch_cflags() {
         armv5) echo "-march=armv5te -mtune=arm946e-s -mfloat-abi=soft" ;;
         armv6) echo "-march=armv6 -mfloat-abi=hard -mfpu=vfp" ;;
         armv7) echo "-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard" ;;
-        i386) echo "-march=i686 -mtune=generic" ;;
         i486) echo "-march=i486 -mtune=generic" ;;
         i586) echo "-march=i586 -mtune=generic" ;;
+        i686) echo "-march=i686 -mtune=generic" ;;
         loongarch64) echo "-march=loongarch64" ;;
         m68k) echo "-march=68020 -fomit-frame-pointer -ffreestanding" ;;
-        mips64) echo "-mips64 -mabi=64" ;;
+        mips64) echo "-march=mips64 -mabi=64" ;;
         mips64el) echo "-mplt" ;;
         powerpc) echo "-mpowerpc -m32" ;;
         powerpcle) echo "-m32" ;;
@@ -203,31 +205,33 @@ get_arch_cflags() {
     esac
 }
 
-# Get musl.cc toolchain name for architecture
+# Get musl toolchain name for architecture
 get_musl_toolchain() {
     local arch=$1
     case "$arch" in
-        aarch64) echo "aarch64-linux-musl" ;;
+        aarch64) echo "aarch64-unknown-linux-musl" ;;
         armv5) echo "armv5-unknown-linux-musleabi" ;;
-        armv6) echo "armv6-linux-musleabihf" ;;
-        armv7) echo "armv7l-linux-musleabihf" ;;
-        i386) echo "i686-linux-musl" ;;
-        i486) echo "i486-linux-musl" ;;
+        armv6) echo "armv6-unknown-linux-musleabihf" ;;
+        armv7) echo "armv7-unknown-linux-musleabihf" ;;
+        i486) echo "i486-unknown-linux-musl" ;;
         i586) echo "i586-unknown-linux-musl" ;;
+        i686) echo "i686-unknown-linux-musl" ;;
         loongarch64) echo "loongarch64-unknown-linux-musl" ;;
-        m68k) echo "m68k-linux-musl" ;;
-        mips) echo "mips-linux-muslsf" ;;
-        mipsel) echo "mipsel-linux-muslsf" ;;
-        mips64) echo "mips64-linux-musl" ;;
-        mips64el) echo "mips64el-linux-musl" ;;
+        m68k) echo "m68k-unknown-linux-musl" ;;
+        microblaze) echo "microblaze-xilinx-linux-musl" ;;
+        mips) echo "mips-unknown-linux-muslsf" ;;
+        mipsel) echo "mipsel-unknown-linux-muslsf" ;;
+        mips64) echo "mips64-unknown-linux-musl" ;;
+        mips64el) echo "mips64el-unknown-linux-musl" ;;
         or1k) echo "or1k-unknown-linux-musl" ;;
-        powerpc) echo "powerpc-linux-muslsf" ;;
-        powerpcle) echo "powerpcle-linux-muslsf" ;;
-        powerpc64) echo "powerpc64-linux-musl" ;;
-        powerpc64le) echo "powerpc64le-linux-musl" ;;
-        riscv64) echo "riscv64-linux-musl" ;;
-        riscv32) echo "riscv32-linux-musl" ;;
-        s390x) echo "s390x-linux-musl" ;;
+        powerpc) echo "powerpc-unknown-linux-muslsf" ;;
+        powerpcle) echo "powerpcle-unknown-linux-muslsf" ;;
+        powerpc64) echo "powerpc64-unknown-linux-musl" ;;
+        powerpc64le) echo "powerpc64le-unknown-linux-musl" ;;
+        riscv64) echo "riscv64-unknown-linux-musl" ;;
+        riscv32) echo "riscv32-unknown-linux-musl" ;;
+        s390x) echo "s390x-ibm-linux-musl" ;;
+        sh4) echo "sh4-multilib-linux-musl" ;;
         x86_64) echo "x86_64-linux-musl" ;;
        *) echo "" ;;
     esac
@@ -240,7 +244,7 @@ get_host_triplet() {
     echo "$toolchain_name"
 }
 
-# Download and setup musl.cc prebuilt toolchain
+# Download and setup musl prebuilt toolchain
 setup_musl_toolchain() {
     local arch=$1
     local toolchain_name=$(get_musl_toolchain "$arch")
@@ -264,25 +268,12 @@ setup_musl_toolchain() {
     fi
 
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
-
-    # Determine toolchain URL and archive type
-    local toolchain_url archive_ext
-    case "$arch" in
-        loongarch64|or1k|armv5|i586)
-            toolchain_url="https://github.com/gfunkmonk/musl-cross/releases/download/01312026/${toolchain_name}.tar.xz"
-            archive_ext="tar.xz"
-            ;;
-        *)
-            toolchain_url="https://musl.cc/${toolchain_name}-cross.tgz"
-            archive_ext="tgz"
-            ;;
-    esac
-
-    local archive_name="${toolchain_name}-cross.${archive_ext}"
+    local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
+    local archive_name="${toolchain_name}.tar.xz"
 
     # Download toolchain
-    if ! curl -sSfL "$toolchain_url" -o "$archive_name"; then
-        echo -e "${YELLOW}Failed to download toolchain from musl.cc, falling back to building musl${NC}"
+    if ! curl -sSfL "${toolchain_url}" -o "$archive_name"; then
+        echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
         return 1
     fi
 
@@ -290,19 +281,11 @@ setup_musl_toolchain() {
     mkdir -p "$toolchain_dir"
 
     # Extract based on archive type (silent extraction)
-    if [[ "$archive_ext" == "tar.xz" ]]; then
-        tar -xJf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
-        echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
-            rm -rf "$toolchain_dir" "$archive_name"
-        return 1
+    tar -xJf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
+    echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
+        rm -rf "$toolchain_dir" "$archive_name"
+    return 1
     }
-    else
-        tar -xzf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
-            echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
-            rm -rf "$toolchain_dir" "$archive_name"
-            return 1
-        }
-    fi
 
     # Verify the compiler exists
     if [[ ! -f "$toolchain_bin" ]]; then
@@ -454,7 +437,7 @@ main() {
         elif [[ ${DL_TOOLCHAIN:-} ]]; then
             # Try to use prebuilt toolchain
             if setup_musl_toolchain "$arch"; then
-                echo -e "${GREEN}= Successfully configured musl.cc toolchain${NC}"
+                echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
 
                 # Set host argument for cross-compilation
                 host_arg="--host=$(get_host_triplet "$arch")"
@@ -570,21 +553,21 @@ main() {
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-static
+    cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-"${arch}"
 
     # Strip binary based on architecture and platform
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        "${STRIPCMD}" -s releases/bash-"${bash_version}"-static 2>/dev/null || true
+        "${STRIPCMD}" -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     elif [[ "$arch" == "mipsel" ]]; then
         echo -e "${LIME}= Stripping binary (mipsel)${NC}"
-        mipsel-linux-muslsf-strip -s releases/bash-"${bash_version}"-static 2>/dev/null || true
+        mipsel-linux-muslsf-strip -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     elif [[ "$target" != "macos" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        strip -s releases/bash-"${bash_version}"-static 2>/dev/null || true
+        strip -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     else
         echo -e "${LIME}= Stripping binary (macOS)${NC}"
-        strip -S releases/bash-"${bash_version}"-static 2>/dev/null || true
+        strip -S releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     fi
 
     # Clean up build directory unless KEEP_BUILD is set
@@ -596,7 +579,7 @@ main() {
     # Compress with UPX (skip on macOS)
     if [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
         echo -e "${ORANGE}= Compressing with UPX${NC}"
-        upx --ultra-brute releases/bash-"${bash_version}"-static 2>/dev/null || true
+        upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     else
         echo -e "${PINK}= Skipping UPX compression (not installed)${NC}"
     fi
@@ -606,12 +589,12 @@ main() {
     echo -e "${NAVAJO}========================================${NC}"
     echo -e "${NAVAJO}=         Build Complete! ✓            =${NC}"
     echo -e "${NAVAJO}========================================${NC}"
-    echo -e "${PEACH}  Output: releases/bash-${bash_version}-static${NC}"
-    echo -e "${JUNEBUD}  Size: $(du -h releases/bash-"${bash_version}"-static 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
+    echo -e "${PEACH}  Output: releases/bash-${bash_version}-${arch}${NC}"
+    echo -e "${JUNEBUD}  Size: $(du -h releases/bash-"${bash_version}"-"${arch}" 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
 
     # Show binary info
     if command -v file >/dev/null 2>&1; then
-        echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-static | cut -d: -f2-)${NC}"
+        echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-"${arch}" | cut -d: -f2-)${NC}"
     fi
 
     echo -e "${GREEN}= Done ${NC}"
