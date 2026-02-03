@@ -419,7 +419,7 @@ main() {
         if [[ -f "$patch" ]]; then
             echo -e "${CREAM}Applying ${patch##*/}${NC}"
             pushd bash-"${bash_version}"
-            patch -sp1 <../"${patch}" || {
+            patch -sp1 < ../"${patch}" || {
                 echo -e "${RED}WARNING: Failed to apply custom patch ${patch##*/}${NC}" >&2
             }
             popd

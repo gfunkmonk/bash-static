@@ -1,0 +1,13 @@
+--- a/builtins/evalfile.c	2026-02-03 08:48:25.763108683 -0500
++++ b/builtins/evalfile.c	2026-02-03 08:49:02.917047923 -0500
+@@ -161,6 +161,10 @@
+       nr = read (fd, string, file_size);
+       if (nr >= 0)
+ 	string[nr] = '\0';
++#if 0
++       if (nr != file_size)
++          nr = -1;            /* XXX - didn't get the whole file */
++#endif
+     }
+   else
+     nr = zmapfd (fd, &string, 0);
