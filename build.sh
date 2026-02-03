@@ -18,6 +18,9 @@ Options (also available via env vars shown in brackets):
   --dl-toolchain      Use prebuilt musl cross-compiler toolchain from github [DL_TOOLCHAIN]
   --nosig             Skip GPG signature verification (not recommended) [NOSIG]
   --extra-cflags VAL  Additional compiler flags to append to default CFLAGS [EXTRA_CFLAGS]
+  --with-tests        Build with tests [WITH_TESTS]
+  --keep-build        Keep build directory on success [KEEP_BUILD]
+  --njobs VAL         Number of parallel jobs (default: auto-detect) [NJOBS]
 
 Environment variables:
   DL_TOOLCHAIN       -- Use prebuilt musl cross-compiler toolchain from github
@@ -333,6 +336,23 @@ main() {
                 ;;
             --extra-cflags=*)
                 EXTRA_CFLAGS=${1#*=}
+                shift
+                ;;
+            --with-tests)
+                WITH_TESTS=1
+                shift
+                ;;
+            --keep-build)
+                KEEP_BUILD=1
+                shift
+                ;;
+            --njobs)
+                NJOBS=${2:-}
+                [[ -z ${NJOBS} ]] && { echo -e "${RED}ERROR: --njobs requires a value${NC}" >&2; exit 1; }
+                shift 2
+                ;;
+            --njobs=*)
+                NJOBS=${1#*=}
                 shift
                 ;;
             --)
