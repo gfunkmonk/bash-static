@@ -530,6 +530,10 @@ main() {
         fi
     fi
 
+    if [[ $arch == mipsel ]]; then
+       host_arg="--host=mipsel-unknown-linux-muslsf"
+    fi
+
     echo -e "${BLUE}===========${REBECCA} Configuration: ${BLUE}=============${NC}"
     echo -e "${TEAL}= Building bash ${bash_version}${NC}"
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
