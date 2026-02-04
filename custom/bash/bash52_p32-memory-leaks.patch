@@ -1,0 +1,84 @@
+diff --git a/arrayfunc.c b/arrayfunc.c
+index 2c05d15b..8ba64084 100644
+--- a/arrayfunc.c
++++ b/arrayfunc.c
+@@ -208,7 +208,10 @@ bind_assoc_var_internal (entry, hash, key, value, flags)
+   newval = make_array_variable_value (entry, 0, key, value, flags);
+ 
+   if (entry->assign_func)
+-    (*entry->assign_func) (entry, newval, 0, key);
++    {
++      (*entry->assign_func) (entry, newval, 0, key);
++      FREE (key);
++    }
+   else
+     assoc_insert (hash, key, newval);
+ 
+@@ -985,6 +988,7 @@ quote_compound_array_word (w, type)
+   if (t != w+ind)
+    free (t);
+   strcpy (nword + i, value);
++  free (value);
+ 
+   return nword;
+ }
+diff --git a/bashline.c b/bashline.c
+index c85b05b6..bd7548cc 100644
+--- a/bashline.c
++++ b/bashline.c
+@@ -1928,6 +1928,7 @@ bash_command_name_stat_hook (name)
+   result = search_for_command (cname, 0);
+   if (result)
+     {
++      FREE (*name);
+       *name = result;
+       return 1;
+     }
+diff --git a/builtins/evalstring.c b/builtins/evalstring.c
+index df3dd68e..20c6a4a7 100644
+--- a/builtins/evalstring.c
++++ b/builtins/evalstring.c
+@@ -461,6 +461,8 @@ parse_and_execute (string, from_file, flags)
+ 		      should_jump_to_top_level = 0;
+ 		      last_result = last_command_exit_value = EX_BADUSAGE;
+ 		      set_pipestatus_from_exit (last_command_exit_value);
++		      dispose_command(command);
++		      global_command = (COMMAND *)NULL;
+ 		      reset_parser ();
+ 		      break;
+ 		    }
+ 
+diff --git a/examples/loadables/stat.c b/examples/loadables/stat.c
+index 1e60e7b6..ed5c9764 100644
+--- a/examples/loadables/stat.c
++++ b/examples/loadables/stat.c
+@@ -349,6 +349,7 @@ loadstat (vname, var, fname, flags, fmt, sp)
+       key = savestring (arraysubs[i]);
+       value = statval (i, fname, flags, fmt, sp);
+       v = bind_assoc_variable (var, vname, key, value, ASS_FORCE);
++      free (value);
+     }
+   return 0;
+ }
+diff --git a/subst.c b/subst.c
+index 1ac6eb2d..ff0602da 100644
+--- a/subst.c
++++ b/subst.c
+@@ -10727,6 +10727,7 @@ comsub:
+ 	    {
+ 	      chk_atstar (temp, quoted, pflags, quoted_dollar_at_p, contains_dollar_at);
+ 	      tdesc = parameter_brace_expand_word (temp, SPECIAL_VAR (temp, 0), quoted, pflags, 0);
++	      free (temp1);
+ 	      if (tdesc == &expand_wdesc_error || tdesc == &expand_wdesc_fatal)
+ 		return (tdesc);
+ 	      ret = tdesc;
+@@ -10739,6 +10740,7 @@ comsub:
+ 	    {
+ 	      set_exit_status (EXECUTION_FAILURE);
+ 	      report_error (_("%s: invalid variable name for name reference"), temp);
++	      free (temp1);
+ 	      return (&expand_wdesc_error);	/* XXX */
+ 	    }
+ 	  else
+-- 
+2.43.0
