@@ -9,7 +9,7 @@ usage() {
 echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
-echo -e "${BWHITE}Where:${NC}"
+echo -e "${CREAM}Where:${NC}"
 echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}macos${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
@@ -17,9 +17,9 @@ echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectu
 echo -e "${PINK}  TAG  ${NAVAJO}-- bash version ${BWHITE}defaults to ${bv}${NC}"
 echo -e "${NAVAJO}       ${CRIMSON}[${MINT}53${CRIMSON}] [${MINT}52${CRIMSON}] [${MINT}51${CRIMSON}] [${MINT}50${CRIMSON}] [${MINT}44${CRIMSON}] [${MINT}43${CRIMSON}] [${MINT}42${CRIMSON}] [${MINT}41${CRIMSON}] [${MINT}40${CRIMSON}] [${MINT}31${CRIMSON}] [${MINT}30${CRIMSON}] [${MINT}20${CRIMSON}]${NC}"
 echo ""
-echo -e "${TURQUOISE}     --help = displays this awesome help dialog${NC}"
-echo -e "${CHARTREUSE}     --list-archs = displays all valid architectures.${NC}"
-echo -e "${SELAGO}     --clean = removes build & release dirs and cache${NC}"
+echo -e "${CHARTREUSE}       --help = displays this awesome help dialog${NC}"
+echo -e "${TURQUOISE}       --list-archs = displays all valid architectures.${NC}"
+echo -e "${SELAGO}       --clean = removes build & release dirs and cache${NC}"
 echo ""
 echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
 echo -e "${MINT} --dl-toolchain      ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
@@ -30,7 +30,7 @@ echo -e "${MINT} --lto               ${BWHITE}= Enable LTO Optimization         
 echo -e "${MINT} --njobs VAL         ${BWHITE}= Number of parallel jobs (default: auto)   ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
 echo -e "${MINT} --ccache            ${BWHITE}= Use ccache if found                       ${SKY}[${GOLD}USE_CCACHE${SKY}]${NC}"
 echo -e "${MINT} --cache-dir DIR     ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
-echo -e "${MINT} --parallel-extract  ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
+echo -e "${MINT} --p-extract         ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
 echo -e "${MINT} --no-upx            ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
 echo -e "${MINT} --with-tests        ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
 echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success                 ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
@@ -38,26 +38,28 @@ echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for re
 echo -e "${MINT} --profile           ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
 echo ""
 echo ""
-echo -e "${GOLD}Examples:${NC}"
-echo -e "${CYAN}  Single build:   ${BWHITE}./build.sh linux aarch64${NC}"
-echo -e "${CYAN}  Multiple archs: ${BWHITE}./build.sh linux x86_64,aarch64,armv7${NC}"
-echo -e "${CYAN}  All archs:      ${BWHITE}./build.sh linux all${NC}"
-echo -e "${CYAN}  With options:   ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo -e "${KHAKI}Examples:${NC}"
+echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
+echo -e "${ORCHID}  Multiple archs: ${OCHRE}./build.sh linux x86_64,aarch64,armv7${NC}"
+echo -e "${ORCHID}  All archs:      ${OCHRE}./build.sh linux all${NC}"
+echo -e "${ORCHID}  With options:   ${OCHRE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
 echo ""
 }
 
 list-architectures() {
 echo ""
-echo -e "${LIGHTROYAL}Available architectures:${NC}"
-echo -e "${TURQUOISE}  Linux (25):${NC}"
+echo -e "${BWHITE}Available architectures:${NC}"
+echo ""
+echo -e "${CHARTREUSE}  Linux (25):${NC}"
 local linux_archs=$(get_all_archs linux)
 for arch in $linux_archs; do
-    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+    echo -e "    ${MOSS}•${NC} ${TOMATO}$arch${NC}"
 done
-echo -e "${TURQUOISE}  macOS (2):${NC}"
+echo ""
+echo -e "${ORCHID}  macOS (2):${NC}"
 local macos_archs=$(get_all_archs macos)
 for arch in $macos_archs; do
-    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+    echo -e "    ${GOLD}•${NC} ${AQUA}$arch${NC}"
 done
 echo ""
 }
@@ -161,9 +163,9 @@ mycurl() {
 
         # Use aria2c if available for faster downloads
         if command -v aria2c >/dev/null 2>&1; then
-            aria2c -x 8 -s 8 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_file}")" -o "$(basename "${cache_file}")" "$url" || return 1
+            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_file}")" -o "$(basename "${cache_file}")" "$url" || return 1
         else
-            curl -sSfL --progress-bar -o "${cache_file}" "$url" || return 1
+            curl -sSfL --progress-bar --retry 5 -o "${cache_file}" "$url" || return 1
         fi
 
         # Link from cache to working directory
@@ -180,12 +182,12 @@ mycurl() {
             echo -e "${GOLD}  URL: ${url}.${sig_ext}${NC}"
 
             if command -v aria2c >/dev/null 2>&1; then
-                aria2c -x 4 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_sig}")" -o "$(basename "${cache_sig}")" "${url}.${sig_ext}" || {
+                aria2c --max-tries=3 --retry-wait=4 -x 4 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_sig}")" -o "$(basename "${cache_sig}")" "${url}.${sig_ext}" || {
                     echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
                     return 1
                 }
             else
-                curl -sSfLO -o "${cache_sig}" "${url}.${sig_ext}" || {
+                curl -sSfLO --retry 3 -o "${cache_sig}" "${url}.${sig_ext}" || {
                     echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
                     return 1
                 }
@@ -372,12 +374,12 @@ setup_musl_toolchain() {
     else
         # Download toolchain
         if command -v aria2c >/dev/null 2>&1; then
-            aria2c -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${toolchain_url}" || {
+            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${toolchain_url}" || {
                 echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
                 return 1
             }
         else
-            if ! curl -sSfL --progress-bar "${toolchain_url}" -o "${cache_archive}"; then
+            if ! curl -sSfL --retry 5 --progress-bar "${toolchain_url}" -o "${cache_archive}"; then
                 echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
                 return 1
             fi
@@ -730,7 +732,7 @@ build_single_arch() {
     # Setup ccache if available
     setup_ccache || true
 
-    echo -e "${BLUE}===========${REBECCA} Configuration: ${BLUE}=============${NC}"
+    echo -e "${REBECCA}===========${HOTPINK} Configuration: ${REBECCA}=============${NC}"
     echo -e "${TEAL}= Building bash ${bash_version}${NC}"
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
     echo -e "${TURQUOISE}  LDFLAGS: ${LDFLAGS:-none}${NC}"
@@ -739,7 +741,7 @@ build_single_arch() {
     [[ -n ${WITH_TESTS:-} ]] && echo -e " ${BWHITE} Build Tests: ${PINK}yes${NC}" || echo -e " ${BWHITE} Build Tests: ${LIME}no${NC}"
     [[ -n ${USE_CCACHE:-} ]] && echo -e " ${BWHITE} ccache: ${GREEN}enabled${NC}"
     [[ -n ${USE_LTO:-} ]] && echo -e " ${BWHITE} LTO: ${GREEN}enabled${NC}"
-    echo -e "${BLUE}========================================${NC}"
+    echo -e "${REBECCA}========================================${NC}"
 
     pushd bash-"${bash_version}"
 
@@ -778,7 +780,7 @@ build_single_arch() {
         echo -e "${LIME}= Stripping binary${NC}"
         strip -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     else
-        echo -e "${LIME}= Stripping binary (macOS)${NC}"
+        echo -e "${BLUE}= Stripping binary (macOS)${NC}"
         strip -S releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     fi
     end_timer "strip"
@@ -914,8 +916,8 @@ main() {
                 export CACHE_DIR=${1#*=}
                 shift
                 ;;
-            --parallel-extract)
-                export PARALLEL_EXTRACT=1
+            --p-extract)
+                export P_EXTRACT=1
                 shift
                 ;;
             --checksum)
