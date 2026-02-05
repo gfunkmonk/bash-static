@@ -935,6 +935,10 @@ main() {
                 export PROFILE_BUILD=1
                 shift
                 ;;
+            --list-archs)
+                list-architectures
+                exit 0
+                ;;
             --*)
                 # Unknown long option
                 echo -e "${RED}ERROR: Unknown option: $1${NC}" >&2
