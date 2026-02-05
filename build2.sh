@@ -11,12 +11,17 @@ echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS
 echo ""
 echo -e "${BWHITE}Where:${NC}"
 echo -e "${JUNEBUD}  OS   ${NAVAJO}-- defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
-echo -e "${TOMATO}  ARCH ${NAVAJO}-- defaults to $(uname -m | tr '[:upper:]' '[:lower:]') ${PINK}(ignored when using --batch)${NC}"
+echo -e "${TOMATO}  ARCH ${NAVAJO}-- defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
+echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
 echo -e "${PINK}  TAG  ${NAVAJO}-- defaults to ${bv}${NC}"
 echo ""
-echo -e "${LAGOON}Options:                                                                   Environment Variables:${NC}"
+echo ""
+echo -e "${CHARTREUSE}  run 'build.sh --list-archs' to display valid architectures."
+echo ""
+echo ""
+echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
 echo -e "${MINT} --dl-toolchain      ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
-echo -e "${MINT} --batch ARCHS       ${BWHITE}= Build multiple archs (comma-separated)    ${SKY}[${GOLD}BATCH_ARCHS${SKY}]${NC}"
 echo -e "${MINT} --nosig             ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
 echo -e "${MINT} --extra-cflags VAL  ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
 echo -e "${MINT} --aggressive        ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
@@ -31,10 +36,28 @@ echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success       
 echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
 echo -e "${MINT} --profile           ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
 echo ""
+echo ""
 echo -e "${GOLD}Examples:${NC}"
-echo -e "${CYAN}  Single build:  ${BWHITE}./build.sh linux aarch64${NC}"
-echo -e "${CYAN}  Batch build:   ${BWHITE}./build.sh --batch x86_64,aarch64,armv7 linux${NC}"
-echo -e "${CYAN}  With options:  ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo -e "${CYAN}  Single build:   ${BWHITE}./build.sh linux aarch64${NC}"
+echo -e "${CYAN}  Multiple archs: ${BWHITE}./build.sh linux x86_64,aarch64,armv7${NC}"
+echo -e "${CYAN}  All archs:      ${BWHITE}./build.sh linux all${NC}"
+echo -e "${CYAN}  With options:   ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo ""
+}
+
+list-architectures() {
+echo ""
+echo -e "${LIGHTROYAL}Available architectures:${NC}"
+echo -e "${TURQUOISE}  Linux (25):${NC}"
+local linux_archs=$(get_all_archs linux)
+for arch in $linux_archs; do
+    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+done
+echo -e "${TURQUOISE}  macOS (2):${NC}"
+local macos_archs=$(get_all_archs macos)
+for arch in $macos_archs; do
+    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+done
 echo ""
 }
 
@@ -139,10 +162,10 @@ mycurl() {
     local url=$1
     local sig_ext=$2
     local filename=${url##*/}
-    
+
     # Create cache directory
     mkdir -p "${CACHE_DIR}"
-    
+
     # Check cache first
     local cache_file="${CACHE_DIR}/${filename}"
     if [[ -f ${cache_file} ]]; then
@@ -152,14 +175,14 @@ mycurl() {
         # Download main file
         echo -e "${HELIOTROPE}Downloading: ${filename}${NC}"
         echo -e "${TAWNY}  URL: ${url}${NC}"
-        
+
         # Use aria2c if available for faster downloads
         if command -v aria2c >/dev/null 2>&1; then
             aria2c -x 8 -s 8 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_file}")" -o "$(basename "${cache_file}")" "$url" || return 1
         else
             curl -sSfL --progress-bar -o "${cache_file}" "$url" || return 1
         fi
-        
+
         # Link from cache to working directory
         ln -sf "${cache_file}" "${filename}" 2>/dev/null || cp "${cache_file}" "${filename}"
     fi
@@ -167,12 +190,12 @@ mycurl() {
     # Handle signature verification
     if [[ ! ${NOSIG:-} ]]; then
         local cache_sig="${CACHE_DIR}/${filename}.${sig_ext}"
-        
+
         # Download signature file if not cached
         if [[ ! -f ${cache_sig} ]]; then
             echo -e "${HELIOTROPE}Downloading signature: ${filename}.${sig_ext}${NC}"
             echo -e "${GOLD}  URL: ${url}.${sig_ext}${NC}"
-            
+
             if command -v aria2c >/dev/null 2>&1; then
                 aria2c -x 4 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_sig}")" -o "$(basename "${cache_sig}")" "${url}.${sig_ext}" || {
                     echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
@@ -185,7 +208,7 @@ mycurl() {
                 }
             fi
         fi
-        
+
         # Link signature from cache
         ln -sf "${cache_sig}" "${filename}.${sig_ext}" 2>/dev/null || cp "${cache_sig}" "${filename}.${sig_ext}"
 
@@ -313,6 +336,23 @@ get_musl_toolchain() {
     esac
 }
 
+# Get all supported architectures for a target OS
+get_all_archs() {
+    local target=$1
+    case "$target" in
+        linux)
+            echo "aarch64 armv5 armv6 armv7 i486 i586 i686 loongarch64 m68k microblaze mips mipsel mips64 mips64el or1k powerpc powerpcle powerpc64 powerpc64le riscv32 riscv64 s390x sh4 x86_64"
+            ;;
+        macos)
+            echo "aarch64 x86_64"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+
 # Download and setup musl prebuilt toolchain with caching
 setup_musl_toolchain() {
     local arch=$1
@@ -409,7 +449,7 @@ build_musl_from_source() {
 
         echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
         rm -rf "musl-${musl_version}"
-        
+
         # Parallel extraction if available
         if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pigz >/dev/null 2>&1; then
             pigz -dc "musl-${musl_version}.tar.gz" | tar -x
@@ -419,6 +459,7 @@ build_musl_from_source() {
 
         # Apply custom musl patches
         echo -e "\n"
+        start_timer "patch_musl"
         apply_patches_parallel "$ROOTDIR/custom/musl" "musl-${musl_version}" "*.patch"
         echo -e "\n"
         end_timer "patch_musl"
@@ -441,30 +482,36 @@ build_musl_from_source() {
 apply_patches_parallel() {
     local patch_dir=$1
     local target_dir=$2
-    local patch_names=$3
-    
+    local patch_pattern=$3
+
     if [[ ! -d "$patch_dir" ]]; then
         return 0
     fi
+
+    # Expand glob pattern properly
+    shopt -s nullglob
+    local patches=()
+    while IFS= read -r -d '' patch; do
+        patches+=("$patch")
+    done < <(find "$patch_dir" -maxdepth 1 -name "$patch_pattern" -type f -print0 | sort -z)
     
-    local patches=("${patch_dir}"/"${patch_names}")
     if [[ ${#patches[@]} -eq 0 ]]; then
         return 0
     fi
-    
-    echo -e "${AQUA}= Applying patches from ${patch_dir}${NC}"
-    
+
+    # Show relative path for cleaner output
+    local display_dir="${patch_dir#$ROOTDIR/}"
+    echo -e "${AQUA}= Applying patches from ${display_dir}${NC}"
+
     for patch in "${patches[@]}"; do
-        if [[ -f "$patch" ]]; then
-            echo -e "${CREAM}Applying ${patch##*/}${NC}"
-            # Get absolute path to patch
-            local abs_patch=$(cd "$(dirname "$patch")" && pwd)/$(basename "$patch")
-            pushd "$target_dir" >/dev/null
-            patch -sp1 --fuzz=4 < "${abs_patch}" || {
-                echo -e "${RED}WARNING: Failed to apply patch ${patch##*/}${NC}" >&2
-            }
-            popd >/dev/null
-        fi
+        echo -e "${CREAM}Applying ${patch##*/}${NC}"
+        # Get absolute path to patch
+        local abs_patch=$(cd "$(dirname "$patch")" && pwd)/$(basename "$patch")
+        pushd "$target_dir" >/dev/null
+        patch -sp1 --fuzz=4 < "${abs_patch}" || {
+            echo -e "${RED}WARNING: Failed to apply patch ${patch##*/}${NC}" >&2
+        }
+        popd >/dev/null
     done
 }
 
@@ -487,9 +534,9 @@ build_single_arch() {
     local target=$1
     local arch=$2
     local tag=$3
-    
+
     echo -e "${BWHITE}Building for: ${VIOLET}OS=${target}, ${TOMATO}ARCH=${arch}${NC}"
-    
+
     start_timer "total_build_${arch}"
 
     # Ensure we are in the project root
@@ -561,7 +608,7 @@ build_single_arch() {
     start_timer "extract_bash"
     echo -e "${HOTPINK}= Extracting bash ${bash_version}${NC}"
     rm -rf bash-"${bash_version}"
-    
+
     if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pigz >/dev/null 2>&1; then
         pigz -dc "bash-${bash_version}.tar.gz" | tar -x
     else
@@ -601,9 +648,9 @@ build_single_arch() {
 
     echo -e "\n"
 
-    # Apply custom bash patches
-    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_version/\./}
-*.patch"
+    # Apply custom bash patches - fixed pattern matching
+    bash_ver_nodot="${bash_version/\./}"
+    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_ver_nodot}-*.patch"
     echo -e "\n"
     end_timer "patch_bash"
 
@@ -638,7 +685,7 @@ build_single_arch() {
         # Linux-specific flags
         export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections"
         export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
-        
+
         # Add LTO if requested
         if [[ -n ${USE_LTO:-} ]]; then
             export CFLAGS="${CFLAGS} -flto"
@@ -649,7 +696,7 @@ build_single_arch() {
         # Add architecture-specific CFLAGS
         arch_cflags=$(get_arch_cflags "$arch")
         [[ -n $arch_cflags ]] && export CFLAGS="${CFLAGS} ${arch_cflags}"
-        
+
         # Add aggressive optimizations if requested
         if [[ -n ${AGGRESSIVE_OPT:-} ]]; then
             export CFLAGS="${CFLAGS} -O3 -ffast-math -funroll-loops"
@@ -696,7 +743,7 @@ build_single_arch() {
     if [[ $arch == mipsel ]]; then
        host_arg="--host=mipsel-unknown-linux-muslsf"
     fi
-    
+
     # Setup ccache if available
     setup_ccache || true
 
@@ -705,7 +752,7 @@ build_single_arch() {
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
     echo -e "${TURQUOISE}  LDFLAGS: ${LDFLAGS:-none}${NC}"
     echo -e "${MINT}  Host: ${host_arg:-native}${NC}"
-    [[ -f "$STRIPCMD" ]] && echo -e "${SKY}  strip: $STRIPCMD${NC}"
+    [[ -f "$STRIPCMD" ]] && echo -e "${SKY}  strip: ${STRIPCMD##*/}${NC}"
     [[ -n ${WITH_TESTS:-} ]] && echo -e " ${BWHITE} Build Tests: ${PINK}yes${NC}" || echo -e " ${BWHITE} Build Tests: ${LIME}no${NC}"
     [[ -n ${USE_CCACHE:-} ]] && echo -e " ${BWHITE} ccache: ${GREEN}enabled${NC}"
     [[ -n ${USE_LTO:-} ]] && echo -e " ${BWHITE} LTO: ${GREEN}enabled${NC}"
@@ -722,7 +769,7 @@ build_single_arch() {
     start_timer "compile"
     make -j"$(get_parallel_jobs)" -s
     end_timer "compile"
-    
+
     if [[ -n ${WITH_TESTS:-} ]]; then
         start_timer "tests"
         make -j"$(get_parallel_jobs)" -s tests
@@ -787,7 +834,7 @@ build_single_arch() {
     fi
 
     end_timer "total_build_${arch}"
-    
+
     # Show timing summary if profiling
     if [[ -n ${PROFILE_BUILD:-} ]]; then
         echo -e "\n${SLATE}=== Build Timing Summary ===${NC}"
@@ -800,12 +847,14 @@ build_single_arch() {
     echo -e "${LEMON}Build completed successfully!${NC}"
 
     popd # project root
-    
+
     return 0
 }
 
 main() {
     parsed_args=()
+    
+    # First pass: extract all options, leave positional args in parsed_args
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help|help)
@@ -813,90 +862,78 @@ main() {
                 exit 0
                 ;;
             --dl-toolchain)
-                DL_TOOLCHAIN=1
+                export DL_TOOLCHAIN=1
                 shift
                 ;;
             --nosig)
-                NOSIG=1
+                export NOSIG=1
                 shift
                 ;;
             --extra-cflags)
                 EXTRA_CFLAGS=${2:-}
                 [[ -z ${EXTRA_CFLAGS} ]] && { echo -e "${RED}ERROR: --extra-cflags requires a value${NC}" >&2; exit 1; }
+                export EXTRA_CFLAGS
                 shift 2
                 ;;
             --extra-cflags=*)
-                EXTRA_CFLAGS=${1#*=}
+                export EXTRA_CFLAGS=${1#*=}
                 shift
                 ;;
             --with-tests)
-                WITH_TESTS=1
+                export WITH_TESTS=1
                 shift
                 ;;
             --keep-build)
-                KEEP_BUILD=1
+                export KEEP_BUILD=1
                 shift
                 ;;
             --njobs)
                 NJOBS=${2:-}
                 [[ -z ${NJOBS} ]] && { echo -e "${RED}ERROR: --njobs requires a value${NC}" >&2; exit 1; }
+                export NJOBS
                 shift 2
                 ;;
             --njobs=*)
-                NJOBS=${1#*=}
+                export NJOBS=${1#*=}
                 shift
                 ;;
             --no-upx)
-                NO_UPX=1
+                export NO_UPX=1
                 shift
                 ;;
             --ccache)
-                USE_CCACHE=1
+                export USE_CCACHE=1
                 shift
                 ;;
             --lto)
-                USE_LTO=1
+                export USE_LTO=1
                 shift
                 ;;
             --aggressive)
-                AGGRESSIVE_OPT=1
+                export AGGRESSIVE_OPT=1
                 shift
                 ;;
             --cache-dir)
                 CACHE_DIR=${2:-}
                 [[ -z ${CACHE_DIR} ]] && { echo -e "${RED}ERROR: --cache-dir requires a value${NC}" >&2; exit 1; }
+                export CACHE_DIR
                 shift 2
                 ;;
             --cache-dir=*)
-                CACHE_DIR=${1#*=}
+                export CACHE_DIR=${1#*=}
                 shift
                 ;;
             --parallel-extract)
-                PARALLEL_EXTRACT=1
-                shift
-                ;;
-            --batch)
-                BATCH_ARCHS=${2:-}
-                [[ -z ${BATCH_ARCHS} ]] && { echo -e "${RED}ERROR: --batch requires a value${NC}" >&2; exit 1; }
-                shift 2
-                ;;
-            --batch=*)
-                BATCH_ARCHS=${1#*=}
+                export PARALLEL_EXTRACT=1
                 shift
                 ;;
             --checksum)
-                GEN_CHECKSUM=1
+                export GEN_CHECKSUM=1
                 shift
                 ;;
             --profile)
-                PROFILE_BUILD=1
+                export PROFILE_BUILD=1
                 shift
-                ;;
-            --)
-                shift
-                # Add all remaining args to parsed_args
-                parsed_args+=("$@")
-                break
                 ;;
             --*)
                 # Unknown long option
@@ -930,39 +967,55 @@ main() {
 
     # Extract positional arguments (OS, ARCH, TAG) from parsed_args
     local target=$dO
-    local default_arch=$dA
+    local arch_input=$dA
     local tag=""
-    
+
     # Process positional arguments
     if [[ ${#parsed_args[@]} -ge 1 ]]; then
         target=${parsed_args[0]}
     fi
-    if [[ ${#parsed_args[@]} -ge 2 ]] && [[ -z ${BATCH_ARCHS:-} ]]; then
-        # Only use positional arch if NOT in batch mode
-        default_arch=$(normalize_arch "${parsed_args[1]}")
+    if [[ ${#parsed_args[@]} -ge 2 ]]; then
+        arch_input=${parsed_args[1]}
     fi
-    if [[ ${#parsed_args[@]} -ge 3 ]] && [[ -z ${BATCH_ARCHS:-} ]]; then
+    if [[ ${#parsed_args[@]} -ge 3 ]]; then
         tag=${parsed_args[2]}
-    elif [[ ${#parsed_args[@]} -ge 2 ]] && [[ -n ${BATCH_ARCHS:-} ]]; then
-        # In batch mode, second arg is tag
-        tag=${parsed_args[1]}
     fi
-    
+
     declare -r musl_mirror='https://musl.libc.org/releases'
 
-    # Handle batch builds
-    if [[ -n ${BATCH_ARCHS:-} ]]; then
-        echo -e "${GOLD}=== Batch Build Mode ===${NC}"
+    # Handle 'all' keyword or comma-separated architecture list
+    local archs_to_build=()
+    
+    if [[ $arch_input == "all" ]]; then
+        # Build all architectures for the target OS
+        local all_archs=$(get_all_archs "$target")
+        if [[ -z $all_archs ]]; then
+            echo -e "${RED}ERROR: No architectures defined for target '${target}'${NC}" >&2
+            exit 1
+        fi
+        IFS=' ' read -ra archs_to_build <<< "$all_archs"
+        echo -e "${GOLD}=== Building ALL architectures for ${target} ===${NC}"
+    elif [[ $arch_input == *,* ]]; then
+        # Comma-separated list of architectures
+        IFS=',' read -ra archs_to_build <<< "$arch_input"
+        echo -e "${GOLD}=== Building multiple architectures ===${NC}"
+    else
+        # Single architecture
+        archs_to_build=($(normalize_arch "$arch_input"))
+    fi
+
+    # If building multiple architectures, use batch mode
+    if [[ ${#archs_to_build[@]} -gt 1 ]]; then
         echo -e "${BWHITE}Target OS: ${target}${NC}"
-        IFS=',' read -ra archs <<< "$BATCH_ARCHS"
+        echo -e "${BWHITE}Architectures: ${archs_to_build[*]}${NC}"
         
         local failed_builds=()
         local successful_builds=()
-        
-        for arch in "${archs[@]}"; do
+
+        for arch in "${archs_to_build[@]}"; do
             arch=$(normalize_arch "$arch")
             echo -e "\n${VIOLET}=== Building for ${arch} ===${NC}\n"
-            
+
             if build_single_arch "$target" "$arch" "$tag"; then
                 successful_builds+=("$arch")
             else
@@ -970,32 +1023,32 @@ main() {
                 echo -e "${RED}Build failed for ${arch}${NC}"
             fi
         done
-        
+
         # Summary
-        echo -e "\n${GOLD}=== Batch Build Summary ===${NC}"
+        echo -e "\n${GOLD}=== Build Summary ===${NC}"
         echo -e "${GREEN}Successful: ${#successful_builds[@]} architectures${NC}"
         for arch in "${successful_builds[@]}"; do
             echo -e "  ${GREEN}✓${NC} $arch"
         done
-        
+
         if [[ ${#failed_builds[@]} -gt 0 ]]; then
             echo -e "${RED}Failed: ${#failed_builds[@]} architectures${NC}"
             for arch in "${failed_builds[@]}"; do
                 echo -e "  ${RED}✗${NC} $arch"
             done
         fi
-        
+
         # Generate checksums if requested
         if [[ -n ${GEN_CHECKSUM:-} ]]; then
             generate_checksums "releases"
         fi
-        
+
         exit 0
     fi
 
     # Single architecture build
-    build_single_arch "$target" "$default_arch" "$tag"
-    
+    build_single_arch "$target" "${archs_to_build[0]}" "$tag"
+
     # Generate checksums if requested
     if [[ -n ${GEN_CHECKSUM:-} ]]; then
         generate_checksums "releases"
