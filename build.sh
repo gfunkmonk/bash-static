@@ -10,13 +10,18 @@ echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${BWHITE}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
-echo -e "${TOMATO}  ARCH ${NAVAJO}-- defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}macos${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
-echo -e "${PINK}  TAG  ${NAVAJO}-- defaults to ${bv}${NC}"
+echo -e "${PINK}  TAG  ${NAVAJO}-- bash version ${BWHITE}defaults to ${bv}${NC}"
+echo -e "${NAVAJO}       ${CRIMSON}[${MINT}53${CRIMSON}] [${MINT}52${CRIMSON}] [${MINT}51${CRIMSON}] [${MINT}50${CRIMSON}] [${MINT}44${CRIMSON}] [${MINT}43${CRIMSON}] [${MINT}42${CRIMSON}] [${MINT}41${CRIMSON}] [${MINT}40${CRIMSON}] [${MINT}31${CRIMSON}] [${MINT}30${CRIMSON}] [${MINT}20${CRIMSON}]${NC}"
 echo ""
-echo -e "${LAGOON}Options:                                                                   Environment Variables:${NC}"
+echo -e "${TURQUOISE}     --help = displays this awesome help dialog${NC}"
+echo -e "${CHARTREUSE}     --list-archs = displays all valid architectures.${NC}"
+echo -e "${SELAGO}     --clean = removes build & release dirs and cache${NC}"
+echo ""
+echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
 echo -e "${MINT} --dl-toolchain      ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
 echo -e "${MINT} --nosig             ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
 echo -e "${MINT} --extra-cflags VAL  ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
@@ -32,6 +37,17 @@ echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success       
 echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
 echo -e "${MINT} --profile           ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
 echo ""
+echo ""
+echo -e "${GOLD}Examples:${NC}"
+echo -e "${CYAN}  Single build:   ${BWHITE}./build.sh linux aarch64${NC}"
+echo -e "${CYAN}  Multiple archs: ${BWHITE}./build.sh linux x86_64,aarch64,armv7${NC}"
+echo -e "${CYAN}  All archs:      ${BWHITE}./build.sh linux all${NC}"
+echo -e "${CYAN}  With options:   ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo ""
+}
+
+list-architectures() {
+echo ""
 echo -e "${LIGHTROYAL}Available architectures:${NC}"
 echo -e "${TURQUOISE}  Linux (25):${NC}"
 local linux_archs=$(get_all_archs linux)
@@ -44,12 +60,6 @@ for arch in $macos_archs; do
     echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
 done
 echo ""
-echo -e "${GOLD}Examples:${NC}"
-echo -e "${CYAN}  Single build:   ${BWHITE}./build.sh linux aarch64${NC}"
-echo -e "${CYAN}  Multiple archs: ${BWHITE}./build.sh linux x86_64,aarch64,armv7${NC}"
-echo -e "${CYAN}  All archs:      ${BWHITE}./build.sh linux all${NC}"
-echo -e "${CYAN}  With options:   ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
-echo ""
 }
 
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/02032026"
@@ -57,57 +67,39 @@ ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 
 # Color definitions
-NC="\033[0m"
-RED="\033[1;31m"
-GREEN="\033[1;32m"
-YELLOW="\033[1;33m"
-BLUE="\033[1;34m"
-PURPLE="\033[1;35m"
-CYAN="\033[1;36m"
-BROWN="\033[0;33m"
-TEAL="\033[2;36m"
-BWHITE="\033[1;37m"
-DKPURPLE="\033[0;35m"
-WHITE="\033[0;37m"
-LIME="\033[38;2;204;255;0m"
-JUNEBUD="\033[38;2;189;218;87m"
-CORAL="\033[38;2;255;127;80m"
-PINK="\033[38;2;255;45;192m"
-HOTPINK="\033[38;2;255;105;180m"
-ORANGE="\033[38;2;255;165;0m"
-PEACH="\033[38;2;246;161;146m"
-GOLD="\033[38;2;255;215;0m"
-NAVAJO="\033[38;2;255;222;173m"
-LEMON="\033[38;2;255;244;79m"
-CANARY="\033[38;2;255;255;153m"
-KHAKI="\033[38;2;226;214;167m"
-CRIMSON="\033[38;2;220;20;60m"
-TAWNY="\033[38;2;204;78;0m"
-ORCHID="\033[38;2;218;112;214m"
-HELIOTROPE="\033[38;2;223;115;255m"
-SLATE="\033[38;2;109;129;150m"
-LAGOON="\033[38;2;142;235;236m"
-PLUM="\033[38;2;142;69;133m"
-VIOLET="\033[38;2;143;0;255m"
-LIGHTROYAL="\033[38;2;10;148;255m"
-TURQUOISE="\033[38;2;64;224;208m"
-MINT="\033[38;2;152;255;152m"
-AQUA="\033[38;2;18;254;202m"
-SKY="\033[38;2;135;206;250m"
-TOMATO="\033[38;2;255;99;71m"
-CREAM="\033[38;2;255;253;208m"
-REBECCA="\033[38;2;102;51;153m"
-SELAGO="\033[38;2;255;215;255m"
-CHARTREUSE="\033[38;2;127;255;0m"
+source ./colors.sh
 
 # Silence pushd/popd
 pushd() { command pushd "$@" >/dev/null; }
 popd() { command popd >/dev/null; }
 
+# Function to clean
+cleanup() {
+read -p "Are you sure you want to delete buid/ releases/ & cache?? (y/n): " -n 1 confirmation
+echo "" # Add a newline after the single character input
+
+if [[ "$confirmation" != 'y' && "$confirmation" != 'Y' ]]; then
+    echo "${SLATE}Operation cancelled.${NC}"
+    exit 1
+fi
+
+rm -fr build/
+rm -fr releases/
+rm -fr .cache/
+rm -fr .ccache/
+
+echo -e "${ORANGE}Cleaned build/, releases/, .cache/, and .ccache/!${NC}"
+
+return 0
+}
+
 # Timing functions for profiling
 declare -A BUILD_TIMINGS
 start_timer() {
-    [[ -n ${PROFILE_BUILD:-} ]] && BUILD_TIMINGS["$1"]=$(date +%s)
+    #[[ -n ${PROFILE_BUILD:-} ]] && BUILD_TIMINGS["$1"]=$(date +%s)
+    if [[ -n ${PROFILE_BUILD:-} ]]; then
+        BUILD_TIMINGS["$1"]=$(date +%s)
+    fi
 }
 
 end_timer() {
@@ -258,7 +250,7 @@ normalize_arch() {
         armv7l) echo "armv7" ;;
         i386|x32) echo "i686" ;;
         openrisc) echo "or1k" ;;
-	        ppc) echo "powerpc" ;;
+        ppc) echo "powerpc" ;;
         ppcle) echo "powerpcle" ;;
         ppc64) echo "powerpc64" ;;
         ppc64le) echo "powerpc64le" ;;
@@ -490,7 +482,7 @@ apply_patches_parallel() {
         return 0
     fi
 
-    # Show relative path for cleaner output
+    # Apply patches......
     local display_dir="${patch_dir#$ROOTDIR/}"
     echo -e "${AQUA}= Applying patches from ${display_dir}${NC}"
 
@@ -641,7 +633,7 @@ build_single_arch() {
 
     # Apply custom bash patches - fixed pattern matching
     bash_ver_nodot="${bash_version/\./}"
-    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_ver_nodot}-*.patch"
+    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_ver_nodot}*.patch"
     echo -e "\n"
     end_timer "patch_bash"
 
@@ -852,6 +844,14 @@ main() {
                 usage
                 exit 0
                 ;;
+            --list-archs|list-archs)
+                list-architectures
+                exit 0
+                ;;
+            --clean|clean)
+                cleanup
+                exit 0
+                ;;
             --dl-toolchain)
                 export DL_TOOLCHAIN=1
                 shift
@@ -945,13 +945,6 @@ main() {
                 ;;
         esac
     done
-
-    # Handle clean command
-    if [[ ${parsed_args[0]:-} = 'clean' ]]; then
-        rm -fr build/ releases/ .cache/ .ccache/
-        echo -e "${ORANGE}Cleaned build/, releases/, .cache/, and .ccache/!${NC}"
-        exit 0
-    fi
 
     myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]')
     myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]')
