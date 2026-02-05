@@ -12,33 +12,119 @@ echo ""
 echo -e "${BWHITE}Where:${NC}"
 echo -e "${JUNEBUD}  OS   ${NAVAJO}-- defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
+echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
 echo -e "${PINK}  TAG  ${NAVAJO}-- defaults to ${bv}${NC}"
 echo ""
-echo -e "${LAGOON}Options (also available via env vars shown in brackets):${NC}"
-echo -e "${MINT}  --dl-toolchain      ${BWHITE}-- Use prebuilt musl cross-compiler toolchain from github ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
-echo -e "${MINT}  --nosig             ${BWHITE}-- Skip GPG signature verification (not recommended) ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
-echo -e "${MINT}  --extra-cflags VAL  ${BWHITE}-- Additional compiler flags to append to default CFLAGS ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
-echo -e "${MINT}  --with-tests        ${BWHITE}-- Build with tests ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
-echo -e "${MINT}  --keep-build        ${BWHITE}-- Keep build directory on success ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
-echo -e "${MINT}  --njobs VAL         ${BWHITE}-- Number of parallel jobs (default: auto-detect) ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
+echo -e "${LAGOON}Options:                                                                   Environment Variables:${NC}"
+echo -e "${MINT} --dl-toolchain      ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
+echo -e "${MINT} --nosig             ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
+echo -e "${MINT} --extra-cflags VAL  ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
+echo -e "${MINT} --aggressive        ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
+echo -e "${MINT} --lto               ${BWHITE}= Enable LTO Optimization                   ${SKY}[${GOLD}USE_LTO${SKY}]${NC}"
+echo -e "${MINT} --njobs VAL         ${BWHITE}= Number of parallel jobs (default: auto)   ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
+echo -e "${MINT} --ccache            ${BWHITE}= Use ccache if found                       ${SKY}[${GOLD}USE_CCACHE${SKY}]${NC}"
+echo -e "${MINT} --cache-dir DIR     ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
+echo -e "${MINT} --parallel-extract  ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
+echo -e "${MINT} --no-upx            ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
+echo -e "${MINT} --with-tests        ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
+echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success                 ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
+echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
+echo -e "${MINT} --profile           ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
+echo ""
+echo -e "${LIGHTROYAL}Available architectures:${NC}"
+echo -e "${TURQUOISE}  Linux (25):${NC}"
+local linux_archs=$(get_all_archs linux)
+for arch in $linux_archs; do
+    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+done
+echo -e "${TURQUOISE}  macOS (2):${NC}"
+local macos_archs=$(get_all_archs macos)
+for arch in $macos_archs; do
+    echo -e "    ${BLUE}•${NC} ${ORANGE}$arch${NC}"
+done
+echo ""
+echo -e "${GOLD}Examples:${NC}"
+echo -e "${CYAN}  Single build:   ${BWHITE}./build.sh linux aarch64${NC}"
+echo -e "${CYAN}  Multiple archs: ${BWHITE}./build.sh linux x86_64,aarch64,armv7${NC}"
+echo -e "${CYAN}  All archs:      ${BWHITE}./build.sh linux all${NC}"
+echo -e "${CYAN}  With options:   ${BWHITE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
 echo ""
 }
 
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/02032026"
-MUSL_PATCH="${PWD}/custom/musl"
+ROOTDIR="${PWD}"
+CACHE_DIR="${CACHE_DIR:-.cache}"
 
 # Color definitions
-source ./colors.sh
+NC="\033[0m"
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[1;34m"
+PURPLE="\033[1;35m"
+CYAN="\033[1;36m"
+BROWN="\033[0;33m"
+TEAL="\033[2;36m"
+BWHITE="\033[1;37m"
+DKPURPLE="\033[0;35m"
+WHITE="\033[0;37m"
+LIME="\033[38;2;204;255;0m"
+JUNEBUD="\033[38;2;189;218;87m"
+CORAL="\033[38;2;255;127;80m"
+PINK="\033[38;2;255;45;192m"
+HOTPINK="\033[38;2;255;105;180m"
+ORANGE="\033[38;2;255;165;0m"
+PEACH="\033[38;2;246;161;146m"
+GOLD="\033[38;2;255;215;0m"
+NAVAJO="\033[38;2;255;222;173m"
+LEMON="\033[38;2;255;244;79m"
+CANARY="\033[38;2;255;255;153m"
+KHAKI="\033[38;2;226;214;167m"
+CRIMSON="\033[38;2;220;20;60m"
+TAWNY="\033[38;2;204;78;0m"
+ORCHID="\033[38;2;218;112;214m"
+HELIOTROPE="\033[38;2;223;115;255m"
+SLATE="\033[38;2;109;129;150m"
+LAGOON="\033[38;2;142;235;236m"
+PLUM="\033[38;2;142;69;133m"
+VIOLET="\033[38;2;143;0;255m"
+LIGHTROYAL="\033[38;2;10;148;255m"
+TURQUOISE="\033[38;2;64;224;208m"
+MINT="\033[38;2;152;255;152m"
+AQUA="\033[38;2;18;254;202m"
+SKY="\033[38;2;135;206;250m"
+TOMATO="\033[38;2;255;99;71m"
+CREAM="\033[38;2;255;253;208m"
+REBECCA="\033[38;2;102;51;153m"
+SELAGO="\033[38;2;255;215;255m"
+CHARTREUSE="\033[38;2;127;255;0m"
 
 # Silence pushd/popd
 pushd() { command pushd "$@" >/dev/null; }
 popd() { command popd >/dev/null; }
 
-# Get number of parallel jobs
+# Timing functions for profiling
+declare -A BUILD_TIMINGS
+start_timer() {
+    [[ -n ${PROFILE_BUILD:-} ]] && BUILD_TIMINGS["$1"]=$(date +%s)
+}
+
+end_timer() {
+    if [[ -n ${PROFILE_BUILD:-} ]]; then
+        local start=${BUILD_TIMINGS["$1"]:-0}
+        local end=$(date +%s)
+        local elapsed=$((end - start))
+        echo -e "${SLATE}⏱  $1: ${elapsed}s${NC}"
+    fi
+}
+
+# Get number of parallel jobs with better detection
 get_parallel_jobs() {
     if [[ -n ${NJOBS:-} ]]; then
         echo "$NJOBS"
     elif command -v nproc >/dev/null 2>&1; then
+        # Use all cores for extraction/patching, N-1 for compilation to avoid overload
         nproc
     elif command -v sysctl >/dev/null 2>&1; then
         sysctl -n hw.physicalcpu
@@ -47,33 +133,75 @@ get_parallel_jobs() {
     fi
 }
 
-# Download and verify files with GPG signatures
+# Setup ccache if requested and available
+setup_ccache() {
+    if [[ -n ${USE_CCACHE:-} ]] && command -v ccache >/dev/null 2>&1; then
+        echo -e "${CANARY}= Setting up ccache${NC}"
+        export CC="ccache ${CC}"
+        export CCACHE_DIR="${PWD}/.ccache"
+        mkdir -p "$CCACHE_DIR"
+        ccache -M 2G >/dev/null 2>&1 || true
+        echo -e "${GREEN}  ccache enabled${NC}"
+        return 0
+    fi
+    return 1
+}
+
+# Enhanced download with caching
 mycurl() {
     (($# == 2)) || return 1
     local url=$1
     local sig_ext=$2
     local filename=${url##*/}
 
-    # Download main file if not cached
-    if [[ ! -f ${filename} ]]; then
+    # Create cache directory
+    mkdir -p "${CACHE_DIR}"
+
+    # Check cache first
+    local cache_file="${CACHE_DIR}/${filename}"
+    if [[ -f ${cache_file} ]]; then
+        echo -e "${BWHITE}Using cached: ${filename}${NC}"
+        ln -sf "${cache_file}" "${filename}" 2>/dev/null || cp "${cache_file}" "${filename}"
+    else
+        # Download main file
         echo -e "${HELIOTROPE}Downloading: ${filename}${NC}"
         echo -e "${TAWNY}  URL: ${url}${NC}"
-        curl -sSfLO "$url" || return 1
-    else
-        echo -e "${BWHITE}Using cached: ${filename}${NC}"
+
+        # Use aria2c if available for faster downloads
+        if command -v aria2c >/dev/null 2>&1; then
+            aria2c -x 8 -s 8 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_file}")" -o "$(basename "${cache_file}")" "$url" || return 1
+        else
+            curl -sSfL --progress-bar -o "${cache_file}" "$url" || return 1
+        fi
+
+        # Link from cache to working directory
+        ln -sf "${cache_file}" "${filename}" 2>/dev/null || cp "${cache_file}" "${filename}"
     fi
 
     # Handle signature verification
     if [[ ! ${NOSIG:-} ]]; then
+        local cache_sig="${CACHE_DIR}/${filename}.${sig_ext}"
+
         # Download signature file if not cached
-        if [[ ! -f ${filename}.${sig_ext} ]]; then
+        if [[ ! -f ${cache_sig} ]]; then
             echo -e "${HELIOTROPE}Downloading signature: ${filename}.${sig_ext}${NC}"
             echo -e "${GOLD}  URL: ${url}.${sig_ext}${NC}"
-            curl -sSfLO "${url}.${sig_ext}" || {
-                echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
-                return 1
-            }
+
+            if command -v aria2c >/dev/null 2>&1; then
+                aria2c -x 4 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_sig}")" -o "$(basename "${cache_sig}")" "${url}.${sig_ext}" || {
+                    echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
+                    return 1
+                }
+            else
+                curl -sSfLO -o "${cache_sig}" "${url}.${sig_ext}" || {
+                    echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
+                    return 1
+                }
+            fi
         fi
+
+        # Link signature from cache
+        ln -sf "${cache_sig}" "${filename}.${sig_ext}" 2>/dev/null || cp "${cache_sig}" "${filename}.${sig_ext}"
 
         # Verify signature
         echo -e "${DKPURPLE}Verifying signature: ${filename}${NC}"
@@ -81,13 +209,13 @@ mycurl() {
             echo -e "${CRIMSON}ERROR: GPG verification failed for ${filename}${NC}" >&2
             return 1
         }
-        echo -e "${GREEN}Signature verified for ${filename}"
+        echo -e "${GREEN}Signature verified for ${filename}${NC}"
     else
         echo -e "${YELLOW}WARNING: Skipping signature verification (NOSIG is set)${NC}" >&2
     fi
 }
 
-# Helper function for robust GPG key import
+# Helper function for robust GPG key import with caching
 import_gpg_key() {
     local key=$1
     local keyservers=(
@@ -130,7 +258,7 @@ normalize_arch() {
         armv7l) echo "armv7" ;;
         i386|x32) echo "i686" ;;
         openrisc) echo "or1k" ;;
-        ppc) echo "powerpc" ;;
+	        ppc) echo "powerpc" ;;
         ppcle) echo "powerpcle" ;;
         ppc64) echo "powerpc64" ;;
         ppc64le) echo "powerpc64le" ;;
@@ -199,7 +327,24 @@ get_musl_toolchain() {
     esac
 }
 
-# Download and setup musl prebuilt toolchain
+# Get all supported architectures for a target OS
+get_all_archs() {
+    local target=$1
+    case "$target" in
+        linux)
+            echo "aarch64 armv5 armv6 armv7 i486 i586 i686 loongarch64 m68k microblaze mips mipsel mips64 mips64el or1k powerpc powerpcle powerpc64 powerpc64le riscv32 riscv64 s390x sh4 x86_64"
+            ;;
+        macos)
+            echo "aarch64 x86_64"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+
+# Download and setup musl prebuilt toolchain with caching
 setup_musl_toolchain() {
     local arch=$1
     local toolchain_name=$(get_musl_toolchain "$arch")
@@ -225,22 +370,46 @@ setup_musl_toolchain() {
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
     local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
     local archive_name="${toolchain_name}.tar.xz"
+    local cache_archive="${CACHE_DIR}/${archive_name}"
 
-    # Download toolchain
-    if ! curl -sSfL "${toolchain_url}" -o "$archive_name"; then
-        echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
-        return 1
+    # Check cache
+    mkdir -p "${CACHE_DIR}"
+    if [[ -f "${cache_archive}" ]]; then
+        echo -e "${BWHITE}Using cached toolchain: ${archive_name}${NC}"
+        ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
+    else
+        # Download toolchain
+        if command -v aria2c >/dev/null 2>&1; then
+            aria2c -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${toolchain_url}" || {
+                echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
+                return 1
+            }
+        else
+            if ! curl -sSfL --progress-bar "${toolchain_url}" -o "${cache_archive}"; then
+                echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
+                return 1
+            fi
+        fi
+        ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
     fi
 
     echo -e "${KHAKI}= Extracting ${toolchain_name} toolchain${NC}"
     mkdir -p "$toolchain_dir"
 
-    # Extract based on archive type (silent extraction)
-    tar -xJf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
-        echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
-        rm -rf "$toolchain_dir" "$archive_name"
-        return 1
-    }
+    # Extract with parallel decompression if available
+    if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pixz >/dev/null 2>&1; then
+        pixz -d < "$archive_name" | tar -x -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
+            echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
+            rm -rf "$toolchain_dir"
+            return 1
+        }
+    else
+        tar -xJf "$archive_name" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
+            echo -e "${RED}ERROR: Failed to extract toolchain${NC}" >&2
+            rm -rf "$toolchain_dir"
+            return 1
+        }
+    fi
 
     # Verify the compiler exists
     if [[ ! -f "$toolchain_bin" ]]; then
@@ -254,15 +423,12 @@ setup_musl_toolchain() {
     export PATH="${toolchain_dir}/bin:${PATH}"
     export STRIPCMD="${toolchain_strip}"
 
-    # Cleanup tarball
-    rm -f "$archive_name"
-
     return 0
 }
 
 # Build musl from source and set CC
-# Expects configure_args array and musl_mirror/musl_version to be set
 build_musl_from_source() {
+    start_timer "musl_build"
     echo -e "${CORAL}= Building musl from source${NC}"
     local install_dir=${PWD}/musl-install-${musl_version}-${arch}
 
@@ -274,27 +440,23 @@ build_musl_from_source() {
 
         echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
         rm -rf "musl-${musl_version}"
-        tar -xf "musl-${musl_version}.tar.gz"
+
+        # Parallel extraction if available
+        if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pigz >/dev/null 2>&1; then
+            pigz -dc "musl-${musl_version}.tar.gz" | tar -x
+        else
+            tar -xzf "musl-${musl_version}.tar.gz"
+        fi
+
+        # Apply custom musl patches
+        echo -e "\n"
+        start_timer "patch_musl"
+        apply_patches_parallel "$ROOTDIR/custom/musl" "musl-${musl_version}" "*.patch"
+        echo -e "\n"
+        end_timer "patch_musl"
 
         echo -e "${CORAL}= Building musl ${musl_version}${NC}"
         pushd "musl-${musl_version}"
-
-        echo -e "\n"
-
-        # Apply custom musl patches
-        if [ -d "${MUSL_PATCH}" ]; then
-             echo -e "${CHARTREUSE}= Apply custom musl patches${NC}"
-             for patch in "${MUSL_PATCH}"/*.patch; do
-                 if [[ -f "$patch" ]]; then
-                     echo -e "${JUNEBUD}Applying ${patch##*/}${NC}"
-                     patch -sp1 <"${patch}" || {
-                     echo -e "${LEMON}WARNING: Failed to apply patch ${patch##*/}${NC}" >&2
-                 }
-             fi
-         done
-        fi
-
-        echo -e "\n"
 
         ./configure --prefix="${install_dir}" "${configure_args[@]}"
         make -j"$(get_parallel_jobs)" -s install
@@ -304,86 +466,79 @@ build_musl_from_source() {
 
     echo -e "${BWHITE}= Setting CC to musl-gcc ${musl_version}${NC}"
     export CC="${install_dir}/bin/musl-gcc"
+    end_timer "musl_build"
 }
 
-main() {
-    parsed_args=()
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -h|--help|help)
-                usage
-                exit 0
-                ;;
-            --dl-toolchain)
-                DL_TOOLCHAIN=1
-                shift
-                ;;
-            --nosig)
-                NOSIG=1
-                shift
-                ;;
-            --extra-cflags)
-                EXTRA_CFLAGS=${2:-}
-                [[ -z ${EXTRA_CFLAGS} ]] && { echo -e "${RED}ERROR: --extra-cflags requires a value${NC}" >&2; exit 1; }
-                shift 2
-                ;;
-            --extra-cflags=*)
-                EXTRA_CFLAGS=${1#*=}
-                shift
-                ;;
-            --with-tests)
-                WITH_TESTS=1
-                shift
-                ;;
-            --keep-build)
-                KEEP_BUILD=1
-                shift
-                ;;
-            --njobs)
-                NJOBS=${2:-}
-                [[ -z ${NJOBS} ]] && { echo -e "${RED}ERROR: --njobs requires a value${NC}" >&2; exit 1; }
-                shift 2
-                ;;
-            --njobs=*)
-                NJOBS=${1#*=}
-                shift
-                ;;
-            --)
-                shift
-                break
-                ;;
-            *)
-                parsed_args+=("$1")
-                shift
-                ;;
-        esac
-    done
+# Parallel patch application
+apply_patches_parallel() {
+    local patch_dir=$1
+    local target_dir=$2
+    local patch_pattern=$3
 
-    # Append any remaining args after -- to positional list
-    if [[ $# -gt 0 ]]; then
-        parsed_args+=("$@")
+    if [[ ! -d "$patch_dir" ]]; then
+        return 0
     fi
 
-    [[ ${parsed_args[0]:-} = 'clean' ]] && rm -fr build/ && rm -fr releases/ && echo -e "${ORANGE} Cleaned build/ and releases/ !!" && exit 0
-    myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]')
-    myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]')
+    # Expand glob pattern properly
+    shopt -s nullglob
+    local patches=()
+    while IFS= read -r -d '' patch; do
+        patches+=("$patch")
+    done < <(find "$patch_dir" -maxdepth 1 -name "$patch_pattern" -type f -print0 | sort -z)
+    
+    if [[ ${#patches[@]} -eq 0 ]]; then
+        return 0
+    fi
 
-    declare -r target=${parsed_args[0]:-$dO}
-    declare -r arch=$(normalize_arch "${parsed_args[1]:-$dA}")
-    declare -r tag=${parsed_args[2]:-}
-    declare -r musl_mirror='https://musl.libc.org/releases'
-    #declare -r musl_mirror='https://github.com/gfunkmonk/bash-static/raw/refs/heads/master/files/'
+    # Show relative path for cleaner output
+    local display_dir="${patch_dir#$ROOTDIR/}"
+    echo -e "${AQUA}= Applying patches from ${display_dir}${NC}"
+
+    for patch in "${patches[@]}"; do
+        echo -e "${CREAM}Applying ${patch##*/}${NC}"
+        # Get absolute path to patch
+        local abs_patch=$(cd "$(dirname "$patch")" && pwd)/$(basename "$patch")
+        pushd "$target_dir" >/dev/null
+        patch -sp1 --fuzz=4 < "${abs_patch}" || {
+            echo -e "${RED}WARNING: Failed to apply patch ${patch##*/}${NC}" >&2
+        }
+        popd >/dev/null
+    done
+}
+
+# Generate checksums for release binaries
+generate_checksums() {
+    local release_dir=$1
+    echo -e "${VIOLET}= Generating SHA256 checksums${NC}"
+    pushd "$release_dir"
+    for binary in bash-*; do
+        if [[ -f "$binary" ]]; then
+            sha256sum "$binary" >> SHA256SUMS
+        fi
+    done
+    echo -e "${GREEN}  Checksums written to SHA256SUMS${NC}"
+    popd
+}
+
+# Build for a single architecture
+build_single_arch() {
+    local target=$1
+    local arch=$2
+    local tag=$3
 
     echo -e "${BWHITE}Building for: ${VIOLET}OS=${target}, ${TOMATO}ARCH=${arch}${NC}"
 
+    start_timer "total_build_${arch}"
+
     # Ensure we are in the project root
-    pushd "${0%/*}"
+    local script_dir="${0%/*}"
+    pushd "$script_dir"
 
     # Load version info
     version_file="./version${tag:+-$tag}.sh"
     if [[ ! -f "$version_file" ]]; then
         echo -e "${RED}ERROR: Version file not found: $version_file${NC}" >&2
-        exit 1
+        return 1
     fi
 
     # shellcheck source=version.sh
@@ -392,7 +547,7 @@ main() {
     # Validate required variables
     if [[ -z ${bash_version:-} ]]; then
         echo -e "${RED}ERROR: bash_version not set in $version_file${NC}" >&2
-        exit 1
+        return 1
     fi
 
     # Make build directory
@@ -400,19 +555,22 @@ main() {
 
     # Prepare GPG for verification (skip if NOSIG is set)
     if [[ ! ${NOSIG:-} ]]; then
+        start_timer "gpg_setup"
         echo -e "${LEMON}= Preparing GPG${NC}"
         export GNUPGHOME=${PWD}/.gnupg
         mkdir -p "$GNUPGHOME"
         chmod 700 "$GNUPGHOME"
 
         # Import public keys
-        import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || exit 2  # bash
-        import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || exit 2  # musl
+        import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || return 2  # bash
+        import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || return 2  # musl
+        end_timer "gpg_setup"
     else
         echo -e "${YELLOW}WARNING: Skipping GPG setup (NOSIG is set)${NC}" >&2
     fi
 
     # Download bash tarball
+    start_timer "download_bash"
     echo -e "${BWHITE}= Downloading bash ${bash_version}${NC}"
     bash_mirrors=(
         "https://ftp.gnu.org/gnu/bash"
@@ -433,15 +591,24 @@ main() {
 
     if [[ $bash_downloaded == false ]]; then
         echo -e "${RED}ERROR: Failed to download bash from all mirrors${NC}" >&2
-        exit 1
+        return 1
     fi
+    end_timer "download_bash"
 
     # Extract bash
+    start_timer "extract_bash"
     echo -e "${HOTPINK}= Extracting bash ${bash_version}${NC}"
     rm -rf bash-"${bash_version}"
-    tar -xf "bash-${bash_version}.tar.gz"
+
+    if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pigz >/dev/null 2>&1; then
+        pigz -dc "bash-${bash_version}.tar.gz" | tar -x
+    else
+        tar -xzf "bash-${bash_version}.tar.gz"
+    fi
+    end_timer "extract_bash"
 
     # Apply official patches
+    start_timer "patch_bash"
     if [[ ${bash_patch_level:-0} -gt 0 ]]; then
         echo -e "${CYAN}= Patching bash ${bash_version} | patches: ${bash_patch_level}${NC}"
         for ((lvl = 1; lvl <= bash_patch_level; lvl++)); do
@@ -472,20 +639,11 @@ main() {
 
     echo -e "\n"
 
-    # Apply custom bash patches
-    echo -e "${AQUA}= Applying custom bash patches${NC}"
-    for patch in ../custom/bash/bash"${bash_version/\./}"*.patch; do
-        if [[ -f "$patch" ]]; then
-            echo -e "${CREAM}Applying ${patch##*/}${NC}"
-            pushd bash-"${bash_version}"
-            patch -sp1 --fuzz=4 < ../"${patch}" || {
-                echo -e "${RED}WARNING: Failed to apply custom patch ${patch##*/}${NC}" >&2
-            }
-            popd
-        fi
-    done
-
+    # Apply custom bash patches - fixed pattern matching
+    bash_ver_nodot="${bash_version/\./}"
+    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_ver_nodot}-*.patch"
     echo -e "\n"
+    end_timer "patch_bash"
 
     # Configure arguments
     configure_args=(--enable-silent-rules)
@@ -493,6 +651,7 @@ main() {
 
     # Platform-specific setup
     if [[ $target == linux ]]; then
+        start_timer "setup_toolchain"
         if . /etc/os-release 2>/dev/null && [[ ${ID:-} == alpine ]]; then
             echo -e "${BWHITE}= Skipping installation of musl (already installed on Alpine)${NC}"
         elif [[ ${DL_TOOLCHAIN:-} ]]; then
@@ -512,14 +671,28 @@ main() {
         else
             build_musl_from_source
         fi
+        end_timer "setup_toolchain"
 
         # Linux-specific flags
         export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections"
         export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections"
 
+        # Add LTO if requested
+        if [[ -n ${USE_LTO:-} ]]; then
+            export CFLAGS="${CFLAGS} -flto"
+            export LDFLAGS="${LDFLAGS} -flto"
+            echo -e "${CANARY}= LTO enabled${NC}"
+        fi
+
         # Add architecture-specific CFLAGS
         arch_cflags=$(get_arch_cflags "$arch")
         [[ -n $arch_cflags ]] && export CFLAGS="${CFLAGS} ${arch_cflags}"
+
+        # Add aggressive optimizations if requested
+        if [[ -n ${AGGRESSIVE_OPT:-} ]]; then
+            export CFLAGS="${CFLAGS} -O3 -ffast-math -funroll-loops"
+            echo -e "${CANARY}= Aggressive optimizations enabled${NC}"
+        fi
 
         # Add custom CFLAGS if provided
         [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
@@ -557,29 +730,42 @@ main() {
         fi
     fi
 
-    # mipsel will NOT compile on Github Actions
-    # without this. Don't remove dummy.
+    # mipsel will NOT compile on Github Actions without this
     if [[ $arch == mipsel ]]; then
        host_arg="--host=mipsel-unknown-linux-muslsf"
     fi
+
+    # Setup ccache if available
+    setup_ccache || true
 
     echo -e "${BLUE}===========${REBECCA} Configuration: ${BLUE}=============${NC}"
     echo -e "${TEAL}= Building bash ${bash_version}${NC}"
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
     echo -e "${TURQUOISE}  LDFLAGS: ${LDFLAGS:-none}${NC}"
     echo -e "${MINT}  Host: ${host_arg:-native}${NC}"
-    [[ -f "$STRIPCMD" ]] && echo -e "${SKY}  strip: $STRIPCMD${NC}"
+    [[ -f "$STRIPCMD" ]] && echo -e "${SKY}  strip: ${STRIPCMD##*/}${NC}"
     [[ -n ${WITH_TESTS:-} ]] && echo -e " ${BWHITE} Build Tests: ${PINK}yes${NC}" || echo -e " ${BWHITE} Build Tests: ${LIME}no${NC}"
+    [[ -n ${USE_CCACHE:-} ]] && echo -e " ${BWHITE} ccache: ${GREEN}enabled${NC}"
+    [[ -n ${USE_LTO:-} ]] && echo -e " ${BWHITE} LTO: ${GREEN}enabled${NC}"
     echo -e "${BLUE}========================================${NC}"
 
     pushd bash-"${bash_version}"
 
+    start_timer "configure"
     export CPPFLAGS="${CFLAGS}" # Some versions need both set
     autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}" "${host_arg}"
+    end_timer "configure"
 
     # Parallel build based on platform
+    start_timer "compile"
     make -j"$(get_parallel_jobs)" -s
-    [[ -n ${WITH_TESTS:-} ]] && make -j"$(get_parallel_jobs)" -s tests
+    end_timer "compile"
+
+    if [[ -n ${WITH_TESTS:-} ]]; then
+        start_timer "tests"
+        make -j"$(get_parallel_jobs)" -s tests
+        end_timer "tests"
+    fi
 
     popd # bash-${bash_version}
     popd # build
@@ -589,6 +775,7 @@ main() {
     cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-"${arch}"
 
     # Strip binary based on architecture and platform
+    start_timer "strip"
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
         "${STRIPCMD}" -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
@@ -602,19 +789,24 @@ main() {
         echo -e "${LIME}= Stripping binary (macOS)${NC}"
         strip -S releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
     fi
+    end_timer "strip"
 
     # Clean up build directory unless KEEP_BUILD is set
     if [[ ! ${KEEP_BUILD:-} ]]; then
-        echo -e "${HELIOTROPE}Cleaning up build directory"
+        echo -e "${HELIOTROPE}Cleaning up build directory${NC}"
         rm -rf build/bash-"${bash_version}"
     fi
 
-    # Compress with UPX (skip on macOS)
-    if [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
+    # Compress with UPX (skip on macOS or if disabled)
+    if [[ ! ${NO_UPX:-} ]] && [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
+        start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
         upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
-    elif [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
+        end_timer "upx"
+    elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
+    elif [[ ${NO_UPX:-} ]]; then
+        echo -e "${PINK}= Skipping UPX compression (disabled)${NC}"
     else
         echo -e "${PINK}= Skipping UPX compression (not installed)${NC}"
     fi
@@ -632,10 +824,226 @@ main() {
         echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-"${arch}" | cut -d: -f2-)${NC}"
     fi
 
+    end_timer "total_build_${arch}"
+
+    # Show timing summary if profiling
+    if [[ -n ${PROFILE_BUILD:-} ]]; then
+        echo -e "\n${SLATE}=== Build Timing Summary ===${NC}"
+        for key in "${!BUILD_TIMINGS[@]}"; do
+            echo -e "${SLATE}  $key${NC}"
+        done
+    fi
+
     echo -e "${GREEN}= Done ${NC}"
     echo -e "${LEMON}Build completed successfully!${NC}"
 
     popd # project root
+
+    return 0
+}
+
+main() {
+    parsed_args=()
+    
+    # First pass: extract all options, leave positional args in parsed_args
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help|help)
+                usage
+                exit 0
+                ;;
+            --dl-toolchain)
+                export DL_TOOLCHAIN=1
+                shift
+                ;;
+            --nosig)
+                export NOSIG=1
+                shift
+                ;;
+            --extra-cflags)
+                EXTRA_CFLAGS=${2:-}
+                [[ -z ${EXTRA_CFLAGS} ]] && { echo -e "${RED}ERROR: --extra-cflags requires a value${NC}" >&2; exit 1; }
+                export EXTRA_CFLAGS
+                shift 2
+                ;;
+            --extra-cflags=*)
+                export EXTRA_CFLAGS=${1#*=}
+                shift
+                ;;
+            --with-tests)
+                export WITH_TESTS=1
+                shift
+                ;;
+            --keep-build)
+                export KEEP_BUILD=1
+                shift
+                ;;
+            --njobs)
+                NJOBS=${2:-}
+                [[ -z ${NJOBS} ]] && { echo -e "${RED}ERROR: --njobs requires a value${NC}" >&2; exit 1; }
+                export NJOBS
+                shift 2
+                ;;
+            --njobs=*)
+                export NJOBS=${1#*=}
+                shift
+                ;;
+            --no-upx)
+                export NO_UPX=1
+                shift
+                ;;
+            --ccache)
+                export USE_CCACHE=1
+                shift
+                ;;
+            --lto)
+                export USE_LTO=1
+                shift
+                ;;
+            --aggressive)
+                export AGGRESSIVE_OPT=1
+                shift
+                ;;
+            --cache-dir)
+                CACHE_DIR=${2:-}
+                [[ -z ${CACHE_DIR} ]] && { echo -e "${RED}ERROR: --cache-dir requires a value${NC}" >&2; exit 1; }
+                export CACHE_DIR
+                shift 2
+                ;;
+            --cache-dir=*)
+                export CACHE_DIR=${1#*=}
+                shift
+                ;;
+            --parallel-extract)
+                export PARALLEL_EXTRACT=1
+                shift
+                ;;
+            --checksum)
+                export GEN_CHECKSUM=1
+                shift
+                ;;
+            --profile)
+                export PROFILE_BUILD=1
+                shift
+                ;;
+            --*)
+                # Unknown long option
+                echo -e "${RED}ERROR: Unknown option: $1${NC}" >&2
+                echo -e "${YELLOW}Use --help to see available options${NC}" >&2
+                exit 1
+                ;;
+            -*)
+                # Unknown short option
+                echo -e "${RED}ERROR: Unknown option: $1${NC}" >&2
+                echo -e "${YELLOW}Use --help to see available options${NC}" >&2
+                exit 1
+                ;;
+            *)
+                # This is a positional argument
+                parsed_args+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    # Handle clean command
+    if [[ ${parsed_args[0]:-} = 'clean' ]]; then
+        rm -fr build/ releases/ .cache/ .ccache/
+        echo -e "${ORANGE}Cleaned build/, releases/, .cache/, and .ccache/!${NC}"
+        exit 0
+    fi
+
+    myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]')
+    myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]')
+
+    # Extract positional arguments (OS, ARCH, TAG) from parsed_args
+    local target=$dO
+    local arch_input=$dA
+    local tag=""
+
+    # Process positional arguments
+    if [[ ${#parsed_args[@]} -ge 1 ]]; then
+        target=${parsed_args[0]}
+    fi
+    if [[ ${#parsed_args[@]} -ge 2 ]]; then
+        arch_input=${parsed_args[1]}
+    fi
+    if [[ ${#parsed_args[@]} -ge 3 ]]; then
+        tag=${parsed_args[2]}
+    fi
+
+    declare -r musl_mirror='https://musl.libc.org/releases'
+
+    # Handle 'all' keyword or comma-separated architecture list
+    local archs_to_build=()
+    
+    if [[ $arch_input == "all" ]]; then
+        # Build all architectures for the target OS
+        local all_archs=$(get_all_archs "$target")
+        if [[ -z $all_archs ]]; then
+            echo -e "${RED}ERROR: No architectures defined for target '${target}'${NC}" >&2
+            exit 1
+        fi
+        IFS=' ' read -ra archs_to_build <<< "$all_archs"
+        echo -e "${GOLD}=== Building ALL architectures for ${target} ===${NC}"
+    elif [[ $arch_input == *,* ]]; then
+        # Comma-separated list of architectures
+        IFS=',' read -ra archs_to_build <<< "$arch_input"
+        echo -e "${GOLD}=== Building multiple architectures ===${NC}"
+    else
+        # Single architecture
+        archs_to_build=($(normalize_arch "$arch_input"))
+    fi
+
+    # If building multiple architectures, use batch mode
+    if [[ ${#archs_to_build[@]} -gt 1 ]]; then
+        echo -e "${BWHITE}Target OS: ${target}${NC}"
+        echo -e "${BWHITE}Architectures: ${archs_to_build[*]}${NC}"
+        
+        local failed_builds=()
+        local successful_builds=()
+
+        for arch in "${archs_to_build[@]}"; do
+            arch=$(normalize_arch "$arch")
+            echo -e "\n${VIOLET}=== Building for ${arch} ===${NC}\n"
+
+            if build_single_arch "$target" "$arch" "$tag"; then
+                successful_builds+=("$arch")
+            else
+                failed_builds+=("$arch")
+                echo -e "${RED}Build failed for ${arch}${NC}"
+            fi
+        done
+
+        # Summary
+        echo -e "\n${GOLD}=== Build Summary ===${NC}"
+        echo -e "${GREEN}Successful: ${#successful_builds[@]} architectures${NC}"
+        for arch in "${successful_builds[@]}"; do
+            echo -e "  ${GREEN}✓${NC} $arch"
+        done
+
+        if [[ ${#failed_builds[@]} -gt 0 ]]; then
+            echo -e "${RED}Failed: ${#failed_builds[@]} architectures${NC}"
+            for arch in "${failed_builds[@]}"; do
+                echo -e "  ${RED}✗${NC} $arch"
+            done
+        fi
+
+        # Generate checksums if requested
+        if [[ -n ${GEN_CHECKSUM:-} ]]; then
+            generate_checksums "releases"
+        fi
+
+        exit 0
+    fi
+
+    # Single architecture build
+    build_single_arch "$target" "${archs_to_build[0]}" "$tag"
+
+    # Generate checksums if requested
+    if [[ -n ${GEN_CHECKSUM:-} ]]; then
+        generate_checksums "releases"
+    fi
 }
 
 # Only execute if not being sourced
