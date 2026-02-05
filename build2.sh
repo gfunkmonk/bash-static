@@ -116,7 +116,9 @@ popd() { command popd >/dev/null; }
 # Timing functions for profiling
 declare -A BUILD_TIMINGS
 start_timer() {
-    [[ -n ${PROFILE_BUILD:-} ]] && BUILD_TIMINGS["$1"]=$(date +%s)
+    if [[ -n ${PROFILE_BUILD:-} ]]; then
+        BUILD_TIMINGS["$1"]=$(date +%s)
+    fi
 }
 
 end_timer() {
