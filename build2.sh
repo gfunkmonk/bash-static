@@ -447,7 +447,7 @@ apply_patches_parallel() {
         return 0
     fi
     
-    local patches=("${patch_dir}"/"${patch_names}")
+    local patches=("${patch_dir}"/${patch_names})
     if [[ ${#patches[@]} -eq 0 ]]; then
         return 0
     fi
@@ -602,8 +602,7 @@ build_single_arch() {
     echo -e "\n"
 
     # Apply custom bash patches
-    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_version/\./}
-*.patch"
+    apply_patches_parallel "$ROOTDIR/custom/bash" "bash-${bash_version}" "bash${bash_version/\./}*.patch"
     echo -e "\n"
     end_timer "patch_bash"
 
@@ -813,7 +812,7 @@ main() {
                 exit 0
                 ;;
             --dl-toolchain)
-                DL_TOOLCHAIN=1
+                export DL_TOOLCHAIN=1
                 shift
                 ;;
             --nosig)
