@@ -799,7 +799,10 @@ build_single_arch() {
         upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]] && [[ ${FORCE_UPX:-} ]]; then
+        start_timer "upx"
         echo -e "${VIOLET}= Compressing with UPX on macOS (forced)${NC}"
+        upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        end_timer "upx"
     elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
     elif [[ ${NO_UPX:-} ]]; then
