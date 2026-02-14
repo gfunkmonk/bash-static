@@ -32,6 +32,7 @@ echo -e "${MINT} --ccache            ${BWHITE}= Use ccache if found             
 echo -e "${MINT} --cache-dir DIR     ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
 echo -e "${MINT} --p-extract         ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
 echo -e "${MINT} --no-upx            ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
+echo -e "${MINT} --force-upx         ${BWHITE}= Force UPX compression (macOS)             ${SKY}[${GOLD}FORCE_UPX${SKY}]${NC}"
 echo -e "${MINT} --with-tests        ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
 echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success                 ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
 echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
@@ -797,6 +798,8 @@ build_single_arch() {
         echo -e "${ORANGE}= Compressing with UPX${NC}"
         upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
         end_timer "upx"
+    elif [[ "$target" == "macos" ]] && [[ ${FORCE_UPX:-} ]]; then
+        echo -e "${VIOLET}= Compressing with UPX on macOS (forced)${NC}"
     elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
     elif [[ ${NO_UPX:-} ]]; then
@@ -892,6 +895,10 @@ main() {
                 ;;
             --no-upx)
                 export NO_UPX=1
+                shift
+                ;;
+            --force-upx)
+                export FORCE_UPX=1
                 shift
                 ;;
             --ccache)
