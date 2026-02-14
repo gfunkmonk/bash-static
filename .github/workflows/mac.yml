@@ -1,0 +1,114 @@
+name: build_macos
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        include:
+          - os: macos-15-intel
+            target: macos
+            arch: x86_64
+          - os: macos-15
+            target: macos
+            arch: aarch64
+    steps:
+    - uses: actions/checkout@v6
+    - name: install apt packages
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -qq build-essential gpg upx
+    - name: install msys2 packages
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          base-devel
+          git
+          gnupg
+    - name: install homebrew packages
+      if: ${{ matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' }}
+      run: |
+        brew install gnupg autoconf bash upx
+    - name: fix macos gpg
+      if: ${{ matrix.os == 'macos-15-intel' || matrix.os == 'macos-15' }}
+      run: |
+        mkdir -p ~/.gnupg/
+        chmod 700 ~/.gnupg/
+        cat > ~/.gnupg/dirmngr.conf << EOF
+        standard-resolver
+        disable-ipv6
+        keyserver hkps://keys.openpgp.org
+        keyserver hkps://keyserver.ubuntu.com
+        EOF
+        cat > ~/.gnupg/gpg.conf << EOF
+        keyserver hkps://keys.openpgp.org
+        EOF
+        gpgconf --kill dirmngr
+        gpgconf --launch dirmngr
+    - name: build
+      run: |
+        if [ -f /opt/homebrew/bin/bash ]; then
+          BASH_PATH=/opt/homebrew/bin/bash
+        elif [ -f /usr/local/bin/bash ]; then
+          BASH_PATH=/usr/local/bin/bash
+        else
+          BASH_PATH=/usr/bin/bash
+        fi
+        $BASH_PATH -c "./build.sh ${{matrix.target}} ${{matrix.arch}}"
+    - name: rename artifact
+      run: |
+        # Find the actual bash binary
+        cd releases
+        BASH_FILE=$(ls bash* | head -n 1)
+        mv -v "$BASH_FILE" bash-${{matrix.target}}-${{matrix.arch}}
+    - uses: actions/upload-artifact@v6
+      with:
+        name: bash-${{matrix.target}}-${{matrix.arch}}
+        path: releases/bash-${{matrix.target}}-${{matrix.arch}}
+  macos-universal:
+    needs:
+      - build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: make executable
+        run: chmod +x artifacts/*/* && ls -al && ls -al artifacts/
+      - name: run lipo to create universal binary
+        run: lipo -create -arch arm64 artifacts/bash-macos-aarch64/bash-macos-aarch64 -arch x86_64 artifacts/bash-macos-x86_64/bash-macos-x86_64 -output bash-macos-universal
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-macos-universal
+          path: bash-macos-universal
+  release:
+    needs:
+      - build
+      - docker-build
+      - misc-build
+      - others-build
+      - macos-universal
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: generate changelog
+        run: ./changelog.sh
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: make executable
+        run: chmod +x artifacts/*/*
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*/*
+          body_path: NOTES.txt
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
