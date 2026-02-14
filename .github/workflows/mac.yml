@@ -59,7 +59,7 @@ jobs:
         else
           BASH_PATH=/usr/bin/bash
         fi
-        $BASH_PATH -c "./build.sh ${{matrix.target}} ${{matrix.arch}}"
+        $BASH_PATH -c "./build.sh --force-upx ${{matrix.target}} ${{matrix.arch}}"
     - name: rename artifact
       run: |
         # Find the actual bash binary
