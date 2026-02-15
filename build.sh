@@ -63,10 +63,10 @@ for arch in $macos_archs; do
     echo -e "    ${GOLD}•${NC} ${AQUA}$arch${NC}"
 done
 echo ""
-echo -e "${KHAKI}  BSD (3):${NC}"
+echo -e "${LIGHTROYAL}  BSD (3):${NC}"
 local bsd_archs=$(get_all_archs bsd)
 for arch in $bsd_archs; do
-    echo -e "    ${BLOOD}•${NC} ${BROWN}$arch${NC}"
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
 }
