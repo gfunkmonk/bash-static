@@ -746,8 +746,10 @@ build_single_arch() {
 
         # BSD-specific flags
         export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -fcommon -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
-        export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -fuse-ld=bfd -Wl,--allow-multiple-definition"
-        configure_args=("${configure_args[@]}" "--disable-nls" "--with-gnu-ld")
+        #export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -fuse-ld=bfd -Wl,--allow-multiple-definition"
+        #configure_args=("${configure_args[@]}" "--disable-nls" "--with-gnu-ld")
+        export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
+        configure_args=("${configure_args[@]}" "--disable-nls")
 
         # Add LTO if requested
         if [[ -n ${USE_LTO:-} ]]; then
