@@ -10,7 +10,7 @@ echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}macos${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}macos${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}bsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
@@ -61,6 +61,12 @@ echo -e "${ORCHID}  macOS (2):${NC}"
 local macos_archs=$(get_all_archs macos)
 for arch in $macos_archs; do
     echo -e "    ${GOLD}•${NC} ${AQUA}$arch${NC}"
+done
+echo ""
+echo -e "${KHAKI}  BSD (3):${NC}"
+local bsd_archs=$(get_all_archs bsd)
+for arch in $bsd_archs; do
+    echo -e "    ${BLOOD}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
 }
@@ -249,9 +255,13 @@ normalize_arch() {
     local raw_arch=$1
     case "$raw_arch" in
         arm64|armv8) echo "aarch64" ;;
-        armv6l) echo "armv6" ;;
-        armv7l) echo "armv7" ;;
-        i386|x32) echo "i686" ;;
+        arm|armel|armv6l) echo "armv6" ;;
+        armv7l|armhf) echo "armv7" ;;
+        i386|x32|x86) echo "i686" ;;
+        68000) echo "m68k" ;;
+        mblaze) echo "microblaze" ;;
+        mips32) echo "mips" ;;
+        mips32el) echo "mipsel" ;;
         openrisc) echo "or1k" ;;
         ppc) echo "powerpc" ;;
         ppcle) echo "powerpcle" ;;
@@ -259,6 +269,7 @@ normalize_arch() {
         ppc64le) echo "powerpc64le" ;;
         risc|risc32) echo "riscv32" ;;
         risc64) echo "riscv64" ;;
+        sh) echo "sh4" ;;
         x86-64|amd64|x64) echo "x86_64" ;;
         *) echo "$raw_arch" ;;
     esac
@@ -270,21 +281,25 @@ get_arch_cflags() {
     case "$arch" in
         aarch64) echo "-march=armv8-a" ;;
         armv5) echo "-march=armv5te -mtune=arm946e-s -mfloat-abi=soft" ;;
-        armv6) echo "-march=armv6 -mfloat-abi=hard -mfpu=vfp" ;;
-        armv7) echo "-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard" ;;
+        armv6) echo "-march=armv6kz -mfloat-abi=hard -mfpu=vfp" ;;
+        armv7) echo "-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard " ;;
         i486) echo "-march=i486 -mtune=generic" ;;
         i586) echo "-march=i586 -mtune=generic" ;;
-        i686) echo "-march=i686 -mtune=generic" ;;
-        loongarch64) echo "-march=loongarch64" ;;
+        i686) echo "-march=pentium-m -mfpmath=sse -mtune=generic" ;;
+        loongarch64) echo "-march=loongarch64 -mabi=lp64d -mtune=la464" ;;
         m68k) echo "-march=68020 -fomit-frame-pointer -ffreestanding" ;;
+        mips) echo "-march=mips32 -mabi=32" ;;
+        mipsel) echo "-march=mips32 -mplt -mabi=32" ;;
         mips64) echo "-march=mips64 -mabi=64" ;;
-        mips64el) echo "-mplt" ;;
+        mips64el) echo "-mplt -mabi=64" ;;
         powerpc) echo "-mpowerpc -m32" ;;
         powerpcle) echo "-m32" ;;
         powerpc64) echo "-mpowerpc64 -m64 -falign-functions=32 -falign-labels=32 -falign-loops=32 -falign-jumps=32" ;;
-        powerpc64le) echo "-m64" ;;
+        powerpc64le) echo "-m64 -falign-functions=32 -falign-labels=32 -falign-loops=32 -falign-jumps=32" ;;
         riscv64) echo "-march=rv64gc -mabi=lp64d" ;;
         riscv32) echo "-ffreestanding -Wno-implicit-function-declaration -Wno-int-conversion" ;;
+        s390x) echo "-march=z196 -mtune=z15" ;;
+        sh4) echo "-fstack-protector-strong" ;;
         x86_64) echo "-march=x86-64 -mtune=generic" ;;
         *) echo "" ;;
     esac
@@ -317,7 +332,10 @@ get_musl_toolchain() {
         riscv32) echo "riscv32-unknown-linux-musl" ;;
         s390x) echo "s390x-ibm-linux-musl" ;;
         sh4) echo "sh4-multilib-linux-musl" ;;
-        x86_64) echo "x86_64-linux-musl" ;;
+        x86_64) echo "x86_64-unknown-linux-musl" ;;
+        netbsd) echo "x86_64-unknown-netbsd" ;;
+        freebsd) echo "x86_64-unknown-freebsd" ;;
+        dragonflybsd) echo "x86_64-unknown-dragonfly" ;;
         *) echo "" ;;
     esac
 }
@@ -331,6 +349,9 @@ get_all_archs() {
             ;;
         macos)
             echo "aarch64 x86_64"
+            ;;
+        bsd)
+            echo "dragonflybsd freebsd netbsd"
             ;;
         *)
             echo ""
@@ -363,7 +384,17 @@ setup_musl_toolchain() {
     fi
 
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
-    local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
+
+    if [[ $arch == netbsd ]]; then
+       local toolchain_url="https://release-assets.githubusercontent.com/github-production-release-asset/577130353/7fab9ef4-9606-49f7-b48e-0f8ccaaaf131?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-02-15T12%3A34%3A25Z&rscd=attachment%3B+filename%3Dx86_64-unknown-linux-gnu.tar.xz&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-02-15T11%3A34%3A00Z&ske=2026-02-15T12%3A34%3A25Z&sks=b&skv=2018-11-09&sig=6OIHL%2BOT7fwhEWXKHFoTfgaOM60lA5AX2AK71okGgqI%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc3MTE2MDM3MiwibmJmIjoxNzcxMTU2NzcyLCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.3qacWF1lwxmGt_F3aPnAfYAbQcP_h7xrcSUBIMq4zJs&response-content-disposition=attachment%3B%20filename%3Dx86_64-unknown-linux-gnu.tar.xz"
+    elif [[ $arch == freebsd ]]; then
+       local toolchain_url="https://release-assets.githubusercontent.com/github-production-release-asset/584165936/8f06f280-0288-409e-97b6-a7fbac0521f9?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-02-15T13%3A06%3A33Z&rscd=attachment%3B+filename%3Dx86_64-unknown-linux-gnu.tar.xz&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-02-15T12%3A06%3A03Z&ske=2026-02-15T13%3A06%3A33Z&sks=b&skv=2018-11-09&sig=9WmmZ2aPf72r3JmVv%2FBV7rZhYjJXAtUsgUpHUcJace8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc3MTE2MDc2NCwibmJmIjoxNzcxMTU3MTY0LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.qhbEB6kBPTStSIHlJu5cTPMJAdZqon71-09XghA_aws&response-content-disposition=attachment%3B%20filename%3Dx86_64-unknown-linux-gnu.tar.xz"
+    elif [[ $arch == dragonflybsd ]]; then
+       local toolchain_url="https://github.com/AmanoTeam/Venti/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+    else
+       local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
+    fi
+
     local archive_name="${toolchain_name}.tar.xz"
     local cache_archive="${CACHE_DIR}/${archive_name}"
 
@@ -677,6 +708,52 @@ build_single_arch() {
             export CFLAGS="${CFLAGS} -flto"
             export LDFLAGS="${LDFLAGS} -flto"
             echo -e "${CANARY}= LTO enabled${NC}"
+        fi
+
+        # Add architecture-specific CFLAGS
+        arch_cflags=$(get_arch_cflags "$arch")
+        [[ -n $arch_cflags ]] && export CFLAGS="${CFLAGS} ${arch_cflags}"
+
+        # Add aggressive optimizations if requested
+        if [[ -n ${AGGRESSIVE_OPT:-} ]]; then
+            export CFLAGS="${CFLAGS} -O3 -ffast-math -funroll-loops"
+            echo -e "${CANARY}= Aggressive optimizations enabled${NC}"
+        fi
+
+        # Add custom CFLAGS if provided
+        [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+
+    elif [[ $target == bsd ]]; then
+        start_timer "setup_toolchain"
+        if [[ ${DL_TOOLCHAIN:-} ]]; then
+            # Try to use prebuilt toolchain
+            if setup_musl_toolchain "$arch"; then
+                echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
+
+                # Set host argument for cross-compilation
+                host_arg="--host=$(get_musl_toolchain "$arch")"
+
+                # Add -std=gnu99 for BSD compatibility
+                export CFLAGS="-std=gnu99 ${CFLAGS:-}"
+            else
+                # Fallback to building musl if toolchain download fails
+                build_musl_from_source
+            fi
+        else
+            build_musl_from_source
+        fi
+        end_timer "setup_toolchain"
+
+        # BSD-specific flags
+        export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -fcommon -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
+        export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -fuse-ld=bfd -Wl,--allow-multiple-definition"
+        configure_args=("${configure_args[@]}" "--disable-nls" "--with-gnu-ld")
+
+        # Add LTO if requested
+        if [[ -n ${USE_LTO:-} ]]; then
+            #export CFLAGS="${CFLAGS} -flto"
+            #export LDFLAGS="${LDFLAGS} -flto"
+            echo -e "${CANARY}= LTO no-work on BSD :(${NC}"
         fi
 
         # Add architecture-specific CFLAGS
