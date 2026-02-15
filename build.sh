@@ -844,22 +844,22 @@ build_single_arch() {
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-"${arch}"
+    cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-"${target}"-"${arch}"
 
     # Strip binary based on architecture and platform
     start_timer "strip"
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        "${STRIPCMD}" -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        "${STRIPCMD}" -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
     elif [[ "$arch" == "mipsel" ]]; then
         echo -e "${LIME}= Stripping binary (mipsel)${NC}"
-        mipsel-linux-muslsf-strip -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        mipsel-linux-muslsf-strip -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
     elif [[ "$target" != "macos" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        strip -s releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        strip -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
     else
         echo -e "${BLUE}= Stripping binary (macOS)${NC}"
-        strip -S releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        strip -S releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
     fi
     end_timer "strip"
 
@@ -873,12 +873,12 @@ build_single_arch() {
     if [[ ! ${NO_UPX:-} ]] && [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
-        upx --ultra-brute releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        upx --ultra-brute releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]] && [[ ${FORCE_UPX:-} ]]; then
         start_timer "upx"
         echo -e "${VIOLET}= Compressing with UPX on macOS (forced)${NC}"
-        upx --ultra-brute --force-macos releases/bash-"${bash_version}"-"${arch}" 2>/dev/null || true
+        upx --ultra-brute --force-macos releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
@@ -893,12 +893,12 @@ build_single_arch() {
     echo -e "${NAVAJO}========================================${NC}"
     echo -e "${NAVAJO}=         Build Complete! ✓            =${NC}"
     echo -e "${NAVAJO}========================================${NC}"
-    echo -e "${PEACH}  Output: releases/bash-${bash_version}-${arch}${NC}"
-    echo -e "${JUNEBUD}  Size: $(du -h releases/bash-"${bash_version}"-"${arch}" 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
+    echo -e "${PEACH}  Output: releases/bash-${bash_version}-${target}-${arch}${NC}"
+    echo -e "${JUNEBUD}  Size: $(du -h releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
 
     # Show binary info
     if command -v file >/dev/null 2>&1; then
-        echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-"${arch}" | cut -d: -f2-)${NC}"
+        echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-"${target}"-"${arch}" | cut -d: -f2-)${NC}"
     fi
 
     end_timer "total_build_${arch}"
