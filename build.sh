@@ -45,7 +45,8 @@ echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
 echo -e "${ORCHID}  Multiple archs: ${OCHRE}./build.sh linux x86_64,aarch64,armv7${NC}"
 echo -e "${ORCHID}  All archs:      ${OCHRE}./build.sh linux all${NC}"
 echo -e "${ORCHID}  With options:   ${OCHRE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
-echo -e "${ORCHID}  NetBSD w/ Zig:  ${OCHRE}./build.sh --use-zig netbsd x86_64${NC}"
+echo -e "${ORCHID}  BSD with Zig:   ${OCHRE}./build.sh --use-zig netbsd x86_64${NC}"
+echo -e "${ORCHID}                  ${OCHRE}./build.sh --use-zig freebsd aarch64${NC}"
 echo ""
 }
 
@@ -587,6 +588,7 @@ build_musl_from_source() {
 # Download and setup Zig for cross-compilation
 setup_zig() {
     local arch=$1
+    local target_os=$2  # netbsd, freebsd, dragonfly, openbsd
     local zig_version="0.13.0"
     
     # Determine host architecture for Zig download
@@ -681,14 +683,56 @@ setup_zig() {
         fi
     fi
     
-    # Determine Zig target triple for cross-compilation
+    # Determine Zig target triple for cross-compilation based on target OS
     local zig_target=""
-    case "$arch" in
-        x86_64) zig_target="x86_64-netbsd" ;;
-        aarch64) zig_target="aarch64-netbsd" ;;
-        i386) zig_target="i386-netbsd" ;;
+    
+    # Map target_os to zig target OS
+    case "$target_os" in
+        netbsd)
+            case "$arch" in
+                x86_64) zig_target="x86_64-netbsd" ;;
+                aarch64) zig_target="aarch64-netbsd" ;;
+                i386) zig_target="i386-netbsd" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig NetBSD cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        freebsd)
+            case "$arch" in
+                x86_64) zig_target="x86_64-freebsd" ;;
+                aarch64) zig_target="aarch64-freebsd" ;;
+                i386) zig_target="i386-freebsd" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig FreeBSD cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        dragonfly)
+            case "$arch" in
+                x86_64) zig_target="x86_64-dragonfly" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig DragonFlyBSD cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        openbsd)
+            case "$arch" in
+                x86_64) zig_target="x86_64-openbsd" ;;
+                aarch64) zig_target="aarch64-openbsd" ;;
+                powerpc) zig_target="powerpc-openbsd" ;;
+                riscv64) zig_target="riscv64-openbsd" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig OpenBSD cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
         *)
-            echo -e "${YELLOW}Unsupported architecture for Zig NetBSD cross-compilation: ${arch}${NC}"
+            echo -e "${YELLOW}Unsupported target OS for Zig cross-compilation: ${target_os}${NC}"
             return 1
             ;;
     esac
@@ -941,10 +985,10 @@ build_single_arch() {
     elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
         
-        # For NetBSD, try Zig first if requested
-        if [[ "${target}" == "netbsd" ]] && [[ ${USE_ZIG:-} ]]; then
-            if setup_zig "$arch"; then
-                echo -e "${GREEN}= Successfully configured Zig for NetBSD cross-compilation${NC}"
+        # Try Zig first for all BSD targets if requested
+        if [[ ${USE_ZIG:-} ]]; then
+            if setup_zig "$arch" "$target"; then
+                echo -e "${GREEN}= Successfully configured Zig for ${target} cross-compilation${NC}"
             else
                 echo -e "${YELLOW}= Zig setup failed, falling back to traditional toolchain${NC}"
                 # Fallback to traditional toolchain
