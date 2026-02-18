@@ -812,7 +812,13 @@ build_single_arch() {
 
     elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
-        if [[ ${DL_TOOLCHAIN:-} ]]; then
+        local host_os
+        host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        if [[ "$host_os" == "$target" ]]; then
+            # Native build — running directly on the target OS (e.g. on a real NetBSD machine)
+            echo -e "${GREEN}= Native ${target} build — using system compiler${NC}"
+        elif [[ ${DL_TOOLCHAIN:-} ]]; then
+            # Cross-compilation from a different host using a prebuilt toolchain
             # Try to use prebuilt toolchain
             if setup_musl_toolchain "$arch"; then
                 echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
