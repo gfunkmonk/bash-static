@@ -10,7 +10,7 @@ echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}macos${BLUE}]${NAVAJO} or ${BLUE}[${YELLOW}bsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux|macos|dragonfly|freebsd|netbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
@@ -22,21 +22,21 @@ echo -e "${TURQUOISE}       --list-archs = displays all valid architectures.${NC
 echo -e "${SELAGO}       --clean = removes build & release dirs and cache${NC}"
 echo ""
 echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
-echo -e "${MINT} --dl-toolchain      ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
-echo -e "${MINT} --nosig             ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
-echo -e "${MINT} --extra-cflags VAL  ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
-echo -e "${MINT} --aggressive        ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
-echo -e "${MINT} --lto               ${BWHITE}= Enable LTO Optimization                   ${SKY}[${GOLD}USE_LTO${SKY}]${NC}"
-echo -e "${MINT} --njobs VAL         ${BWHITE}= Number of parallel jobs (default: auto)   ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
-echo -e "${MINT} --ccache            ${BWHITE}= Use ccache if found                       ${SKY}[${GOLD}USE_CCACHE${SKY}]${NC}"
-echo -e "${MINT} --cache-dir DIR     ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
-echo -e "${MINT} --p-extract         ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
-echo -e "${MINT} --no-upx            ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
-echo -e "${MINT} --force-upx         ${BWHITE}= Force UPX compression (macOS)             ${SKY}[${GOLD}FORCE_UPX${SKY}]${NC}"
-echo -e "${MINT} --with-tests        ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
-echo -e "${MINT} --keep-build        ${BWHITE}= Keep build dir on success                 ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
-echo -e "${MINT} --checksum          ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
-echo -e "${MINT} --profile           ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
+echo -e "${MINT} --dl-toolchain       ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
+echo -e "${MINT} --nosig              ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
+echo -e "${MINT} --extra-cflags 'VAL' ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
+echo -e "${MINT} --aggressive         ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
+echo -e "${MINT} --lto                ${BWHITE}= Enable LTO Optimization                   ${SKY}[${GOLD}USE_LTO${SKY}]${NC}"
+echo -e "${MINT} --njobs VAL          ${BWHITE}= Number of parallel jobs (default: auto)   ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
+echo -e "${MINT} --ccache             ${BWHITE}= Use ccache if found                       ${SKY}[${GOLD}USE_CCACHE${SKY}]${NC}"
+echo -e "${MINT} --cache-dir 'DIR'    ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
+echo -e "${MINT} --p-extract          ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
+echo -e "${MINT} --no-upx             ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
+echo -e "${MINT} --force-upx          ${BWHITE}= Force UPX compression (macOS)             ${SKY}[${GOLD}FORCE_UPX${SKY}]${NC}"
+echo -e "${MINT} --with-tests         ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
+echo -e "${MINT} --keep-build         ${BWHITE}= Keep build dir on success                 ${SKY}[${GOLD}KEEP_BUILD${SKY}]${NC}"
+echo -e "${MINT} --checksum           ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
+echo -e "${MINT} --profile            ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
 echo ""
 echo ""
 echo -e "${KHAKI}Examples:${NC}"
@@ -54,17 +54,35 @@ echo ""
 echo -e "${CHARTREUSE}  Linux (25):${NC}"
 local linux_archs=$(get_all_archs linux)
 for arch in $linux_archs; do
-    echo -e "    ${MOSS}•${NC} ${TOMATO}$arch${NC}"
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
 echo -e "${ORCHID}  macOS (2):${NC}"
 local macos_archs=$(get_all_archs macos)
 for arch in $macos_archs; do
-    echo -e "    ${GOLD}•${NC} ${AQUA}$arch${NC}"
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${LIGHTROYAL}  BSD (3):${NC}"
-local bsd_archs=$(get_all_archs bsd)
+echo -e "${LIGHTROYAL}  DragonFlyBSD (1):${NC}"
+local bsd_archs=$(get_all_archs dragonfly)
+for arch in $bsd_archs; do
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
+done
+echo ""
+echo -e "${VIOLETBLUE}  FreeBSD (3):${NC}"
+local bsd_archs=$(get_all_archs freebsd)
+for arch in $bsd_archs; do
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
+done
+echo ""
+echo -e "${PEACH}  NetBSD (3):${NC}"
+local bsd_archs=$(get_all_archs netbsd)
+for arch in $bsd_archs; do
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
+done
+echo ""
+echo -e "${GOLD} OpenBSD (3):${NC}"
+local bsd_archs=$(get_all_archs openbsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
@@ -253,6 +271,7 @@ import_gpg_key() {
 # Normalize architecture names
 normalize_arch() {
     local raw_arch=$1
+    if [[ $target == linux ]]; then
     case "$raw_arch" in
         arm64|armv8) echo "aarch64" ;;
         arm|armel|armv6l) echo "armv6" ;;
@@ -273,11 +292,20 @@ normalize_arch() {
         x86-64|amd64|x64) echo "x86_64" ;;
         *) echo "$raw_arch" ;;
     esac
+    else
+    case "$raw_arch" in
+        arm64|armv8) echo "aarch64" ;;
+        i686|x32|x86) echo "i386" ;;
+        x86-64|amd64|x64) echo "x86_64" ;;
+        *) echo "$raw_arch" ;;
+    esac
+    fi
 }
 
 # Get per-architecture default CFLAGS
 get_arch_cflags() {
     local arch=$1
+    if [[ $target != openbsd ]]; then
     case "$arch" in
         aarch64) echo "-march=armv8-a" ;;
         armv5) echo "-march=armv5te -mtune=arm946e-s -mfloat-abi=soft" ;;
@@ -303,11 +331,13 @@ get_arch_cflags() {
         x86_64) echo "-march=x86-64 -mtune=generic" ;;
         *) echo "" ;;
     esac
+    fi
 }
 
 # Get musl toolchain name for architecture
 get_musl_toolchain() {
     local arch=$1
+    if [[ "${target}" == "linux" ]]; then
     case "$arch" in
         aarch64) echo "aarch64-unknown-linux-musl" ;;
         armv5) echo "armv5-unknown-linux-musleabi" ;;
@@ -333,11 +363,35 @@ get_musl_toolchain() {
         s390x) echo "s390x-ibm-linux-musl" ;;
         sh4) echo "sh4-multilib-linux-musl" ;;
         x86_64) echo "x86_64-unknown-linux-musl" ;;
-        netbsd) echo "x86_64-unknown-netbsd" ;;
-        freebsd) echo "x86_64-unknown-freebsd" ;;
-        dragonflybsd) echo "x86_64-unknown-dragonfly" ;;
         *) echo "" ;;
     esac
+    elif [[ "${target}" == "netbsd" ]]; then
+    case "$arch" in
+        aarch64) echo "aarch64-unknown-netbsd" ;;
+        i386) echo "i386-unknown-netbsdelf" ;;
+        x86_64) echo "x86_64-unknown-netbsd" ;;
+        *) echo "" ;;
+    esac
+    elif [[ "${target}" == "freebsd" ]]; then
+    case "$arch" in
+        aarch64) echo "aarch64-unknown-freebsd" ;;
+        i386) echo "i386-unknown-freebsd" ;;
+        x86_64) echo "x86_64-unknown-freebsd" ;;
+        *) echo "" ;;
+    esac
+    elif [[ "${target}" == "dragonfly" ]]; then
+    case "$arch" in
+        x86_64) echo "x86_64-unknown-dragonfly" ;;
+        *) echo "" ;;
+    esac
+    elif [[ "${target}" == "openbsd" ]]; then
+    case "$arch" in
+        powerpc) echo "powerpc-unknown-openbsd" ;;
+        riscv64) echo "riscv64-unknown-openbsd" ;;
+        x86_64) echo "x86_64-unknown-openbsd" ;;
+        *) echo "" ;;
+    esac
+    fi
 }
 
 # Get all supported architectures for a target OS
@@ -350,8 +404,17 @@ get_all_archs() {
         macos)
             echo "aarch64 x86_64"
             ;;
-        bsd)
-            echo "dragonflybsd freebsd netbsd"
+        dragonfly)
+            echo "x86_64"
+            ;;
+        freebsd)
+            echo "aarch64 i386 x86_64"
+            ;;
+        netbsd)
+            echo "aarch64 i386 x86_64"
+            ;;
+        openbsd)
+            echo "powerpc riscv64 x86_64"
             ;;
         *)
             echo ""
@@ -370,7 +433,18 @@ setup_musl_toolchain() {
         return 1
     fi
 
-    local toolchain_dir="${PWD}/toolchain-${toolchain_name}"
+    if [[ $target == dragonfly ]]; then
+       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-dragonfly"
+    elif [[ $target == freebsd ]]; then
+       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-freebsd"
+    elif [[ $target == netbsd ]]; then
+       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-netbsd"
+    elif [[ $target == openbsd ]]; then
+       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-openbsd"
+    else
+       local toolchain_dir="${PWD}/toolchain-${toolchain_name}"
+    fi
+
     local toolchain_bin="${toolchain_dir}/bin/${toolchain_name}-gcc"
     local toolchain_strip="${toolchain_dir}/bin/${toolchain_name}-strip"
 
@@ -385,17 +459,23 @@ setup_musl_toolchain() {
 
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
 
-    if [[ $arch == netbsd ]]; then
-       local toolchain_url="https://release-assets.githubusercontent.com/github-production-release-asset/577130353/7fab9ef4-9606-49f7-b48e-0f8ccaaaf131?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-02-15T12%3A34%3A25Z&rscd=attachment%3B+filename%3Dx86_64-unknown-linux-gnu.tar.xz&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-02-15T11%3A34%3A00Z&ske=2026-02-15T12%3A34%3A25Z&sks=b&skv=2018-11-09&sig=6OIHL%2BOT7fwhEWXKHFoTfgaOM60lA5AX2AK71okGgqI%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc3MTE2MDM3MiwibmJmIjoxNzcxMTU2NzcyLCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.3qacWF1lwxmGt_F3aPnAfYAbQcP_h7xrcSUBIMq4zJs&response-content-disposition=attachment%3B%20filename%3Dx86_64-unknown-linux-gnu.tar.xz"
-    elif [[ $arch == freebsd ]]; then
-       local toolchain_url="https://release-assets.githubusercontent.com/github-production-release-asset/584165936/8f06f280-0288-409e-97b6-a7fbac0521f9?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-02-15T13%3A06%3A33Z&rscd=attachment%3B+filename%3Dx86_64-unknown-linux-gnu.tar.xz&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-02-15T12%3A06%3A03Z&ske=2026-02-15T13%3A06%3A33Z&sks=b&skv=2018-11-09&sig=9WmmZ2aPf72r3JmVv%2FBV7rZhYjJXAtUsgUpHUcJace8%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc3MTE2MDc2NCwibmJmIjoxNzcxMTU3MTY0LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.qhbEB6kBPTStSIHlJu5cTPMJAdZqon71-09XghA_aws&response-content-disposition=attachment%3B%20filename%3Dx86_64-unknown-linux-gnu.tar.xz"
-    elif [[ $arch == dragonflybsd ]]; then
+    if [[ $target == netbsd ]]; then
+       local toolchain_url="https://github.com/AmanoTeam/Dakini/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local archive_name="x86_64-unknown-netbsd.tar.xz"
+    elif [[ $target == freebsd ]]; then
+       local toolchain_url="https://github.com/AmanoTeam/Loki/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local archive_name="x86_64-unknown-freebsd.tar.xz"
+    elif [[ $target == dragonfly ]]; then
        local toolchain_url="https://github.com/AmanoTeam/Venti/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local archive_name="x86_64-unknown-dragonfly.tar.xz"
+    elif [[ $target == openbsd ]]; then
+       local toolchain_url="https://github.com/AmanoTeam/Atar/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
+       local archive_name="x86_64-unknown-openbsd.tar.xz"
     else
        local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
+       local archive_name="${toolchain_name}.tar.xz"
     fi
 
-    local archive_name="${toolchain_name}.tar.xz"
     local cache_archive="${CACHE_DIR}/${archive_name}"
 
     # Check cache
@@ -456,7 +536,7 @@ setup_musl_toolchain() {
 build_musl_from_source() {
     start_timer "musl_build"
     echo -e "${CORAL}= Building musl from source${NC}"
-    local install_dir=${PWD}/musl-install-${musl_version}-${arch}
+    local install_dir=${PWD}/musl-install-${musl_version}-${target}-${arch}
 
     if [[ -f ${install_dir}/bin/musl-gcc ]]; then
         echo -e "${LAGOON}= Reusing existing musl ${musl_version}${NC}"
@@ -491,7 +571,14 @@ build_musl_from_source() {
     fi
 
     echo -e "${BWHITE}= Setting CC to musl-gcc ${musl_version}${NC}"
-    export CC="${install_dir}/bin/musl-gcc"
+
+    if [[ ! -f "${install_dir}/bin/musl-gcc" ]]; then
+       echo -e "${RED}ERROR: Compilation failed - musl gcc binary not found${NC}" >&2
+       return 1
+    else
+       export CC="${install_dir}/bin/musl-gcc"
+    fi
+
     end_timer "musl_build"
 }
 
@@ -723,7 +810,7 @@ build_single_arch() {
         # Add custom CFLAGS if provided
         [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
 
-    elif [[ $target == bsd ]]; then
+    elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
         if [[ ${DL_TOOLCHAIN:-} ]]; then
             # Try to use prebuilt toolchain
@@ -745,11 +832,19 @@ build_single_arch() {
         end_timer "setup_toolchain"
 
         # BSD-specific flags
-        export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -fcommon -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
-        #export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -fuse-ld=bfd -Wl,--allow-multiple-definition"
-        #configure_args=("${configure_args[@]}" "--disable-nls" "--with-gnu-ld")
-        export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
-        configure_args=("${configure_args[@]}" "--disable-nls")
+        if [[ "${target}" == "netbsd" ]]; then
+           export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
+           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition -Wl,-z,relro"
+           configure_args=("${configure_args[@]}" "--disable-nls")
+        elif [[ "${target}" == "openbsd" ]]; then
+           export CFLAGS="${CFLAGS:-} -Os -ffunction-sections -fdata-sections -fcommon"
+           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
+           configure_args=("${configure_args[@]}" "--enable-static")
+        else
+           export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
+           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
+           configure_args=("${configure_args[@]}")
+        fi
 
         # Add LTO if requested
         if [[ -n ${USE_LTO:-} ]]; then
@@ -841,27 +936,54 @@ build_single_arch() {
         end_timer "tests"
     fi
 
+    # Verify bash binary was built successfully
+    if [[ ! -f bash ]]; then
+        echo -e "${RED}ERROR: Compilation failed - bash binary not found${NC}" >&2
+        popd # bash-${bash_version}
+        popd # build
+        popd # project root
+        return 1
+    fi
+
     popd # bash-${bash_version}
     popd # build
 
+    if [[ "$target" == "linux" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-Linux-${arch}"
+    elif [[ "$target" == "macos" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-macOS-${arch}"
+    elif [[ "$target" == "freebsd" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-FreeBSD-${arch}"
+    elif [[ "$target" == "dragonfly" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-DragonFlyBSD-${arch}"
+    elif [[ "$target" == "netbsd" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-NetBSD-${arch}"
+    elif [[ "$target" == "openbsd" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-OpenBSD-${arch}"
+    fi
+
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/bash-"${bash_version}"-"${target}"-"${arch}"
+    cp build/bash-"${bash_version}"/bash releases/$OUTPUT_FILE || {
+        echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
+        popd # project root
+        return 1
+    }
 
     # Strip binary based on architecture and platform
     start_timer "strip"
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        "${STRIPCMD}" -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
-    elif [[ "$arch" == "mipsel" ]]; then
+        "${STRIPCMD}" -s releases/$OUTPUT_FILE 2>/dev/null || true
+    elif [[ "$arch" == "mipsel" ]] && [[ "$DL_TOOLCHAIN" != "1" ]]; then
         echo -e "${LIME}= Stripping binary (mipsel)${NC}"
-        mipsel-linux-muslsf-strip -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
+        mipsel-linux-muslsf-strip -s releases/$OUTPUT_FILE 2>/dev/null || true
     elif [[ "$target" != "macos" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        strip -s releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
+        strip -s releases/$OUTPUT_FILE 2>/dev/null || true
     else
         echo -e "${BLUE}= Stripping binary (macOS)${NC}"
-        strip -S releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
+        strip -S releases/$OUTPUT_FILE 2>/dev/null || true
     fi
     end_timer "strip"
 
@@ -875,12 +997,12 @@ build_single_arch() {
     if [[ ! ${NO_UPX:-} ]] && [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
-        upx --ultra-brute releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
+        upx --ultra-brute releases/$OUTPUT_FILE 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]] && [[ ${FORCE_UPX:-} ]]; then
         start_timer "upx"
         echo -e "${VIOLET}= Compressing with UPX on macOS (forced)${NC}"
-        upx --ultra-brute --force-macos releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null || true
+        upx --ultra-brute --force-macos releases/$OUTPUT_FILE 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
@@ -895,12 +1017,12 @@ build_single_arch() {
     echo -e "${NAVAJO}========================================${NC}"
     echo -e "${NAVAJO}=         Build Complete! ✓            =${NC}"
     echo -e "${NAVAJO}========================================${NC}"
-    echo -e "${PEACH}  Output: releases/bash-${bash_version}-${target}-${arch}${NC}"
-    echo -e "${JUNEBUD}  Size: $(du -h releases/bash-"${bash_version}"-"${target}"-"${arch}" 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
+    echo -e "${PEACH}  Output: releases/$OUTPUT_FILE${NC}"
+    echo -e "${JUNEBUD}  Size:   $(du -h releases/$OUTPUT_FILE 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
 
     # Show binary info
     if command -v file >/dev/null 2>&1; then
-        echo -e "${ORCHID}  Type: $(file releases/bash-"${bash_version}"-"${target}"-"${arch}" | cut -d: -f2-)${NC}"
+        echo -e "${ORCHID}  Type:  $(file releases/$OUTPUT_FILE | cut -d: -f2-)${NC}"
     fi
 
     end_timer "total_build_${arch}"
@@ -1128,6 +1250,7 @@ main() {
     if [[ -n ${GEN_CHECKSUM:-} ]]; then
         generate_checksums "releases"
     fi
+
 }
 
 # Only execute if not being sourced
