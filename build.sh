@@ -81,7 +81,7 @@ for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${GOLD} OpenBSD (12):${NC}"
+echo -e "${GOLD} OpenBSD (10):${NC}"
 local bsd_archs=$(get_all_archs openbsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
@@ -398,9 +398,7 @@ get_musl_toolchain() {
         mips64) echo "mips64-unknown-openbsd" ;;
         mips64el) echo "mips64el-unknown-openbsd" ;;
         powerpc) echo "powerpc-unknown-openbsd" ;;
-        powerpc64) echo "powerpc64-unknown-openbsd" ;;
         riscv64) echo "riscv64-unknown-openbsd" ;;
-        sparc64) echo "sparc64-unknown-openbsd" ;;
         x86_64) echo "x86_64-unknown-openbsd" ;;
         *) echo "" ;;
     esac

@@ -154,6 +154,26 @@ jobs:
             arch: i386
           - target: freebsd
             arch: x86_64
+          - target: openbsd
+            arch: aarch64
+          - target: openbsd
+            arch: alpha
+          - target: openbsd
+            arch: arm
+          - target: openbsd
+            arch: hppa
+          - target: openbsd
+            arch: i386
+          - target: openbsd
+            arch: mips64
+          - target: openbsd
+            arch: mips64el
+          - target: openbsd
+            arch: powerpc
+          - target: openbsd
+            arch: riscv64
+          - target: openbsd
+            arch: x86_64
     steps:
     - uses: actions/checkout@v6
     - name: install apt packages
