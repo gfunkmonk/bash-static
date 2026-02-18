@@ -423,6 +423,20 @@ get_all_archs() {
 }
 
 
+# Get the AmanoTeam host triple for the current machine (used to select the right BSD cross-compiler archive)
+get_amano_host_triple() {
+    local host_arch
+    host_arch=$(uname -m)
+    case "$host_arch" in
+        x86_64)  echo "x86_64-unknown-linux-gnu" ;;
+        aarch64) echo "aarch64-unknown-linux-gnu" ;;
+        *)
+            echo -e "${YELLOW}WARNING: Unrecognized host architecture '${host_arch}', defaulting to x86_64-unknown-linux-gnu${NC}" >&2
+            echo "x86_64-unknown-linux-gnu"
+            ;;
+    esac
+}
+
 # Download and setup musl prebuilt toolchain with caching
 setup_musl_toolchain() {
     local arch=$1
@@ -433,14 +447,18 @@ setup_musl_toolchain() {
         return 1
     fi
 
+    # Determine host triple for selecting the correct BSD cross-compiler archive
+    local host_triple
+    host_triple=$(get_amano_host_triple)
+
     if [[ $target == dragonfly ]]; then
-       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-dragonfly"
+       local toolchain_dir="${PWD}/toolchain-${host_triple}-dragonfly"
     elif [[ $target == freebsd ]]; then
-       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-freebsd"
+       local toolchain_dir="${PWD}/toolchain-${host_triple}-freebsd"
     elif [[ $target == netbsd ]]; then
-       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-netbsd"
+       local toolchain_dir="${PWD}/toolchain-${host_triple}-netbsd"
     elif [[ $target == openbsd ]]; then
-       local toolchain_dir="${PWD}/toolchain-x86_64-unknown-openbsd"
+       local toolchain_dir="${PWD}/toolchain-${host_triple}-openbsd"
     else
        local toolchain_dir="${PWD}/toolchain-${toolchain_name}"
     fi
@@ -460,17 +478,17 @@ setup_musl_toolchain() {
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
 
     if [[ $target == netbsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Dakini/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
-       local archive_name="x86_64-unknown-netbsd.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/Dakini/releases/download/gcc-15/${host_triple}.tar.xz"
+       local archive_name="${host_triple}-netbsd.tar.xz"
     elif [[ $target == freebsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Loki/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
-       local archive_name="x86_64-unknown-freebsd.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/Loki/releases/download/gcc-15/${host_triple}.tar.xz"
+       local archive_name="${host_triple}-freebsd.tar.xz"
     elif [[ $target == dragonfly ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Venti/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
-       local archive_name="x86_64-unknown-dragonfly.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/Venti/releases/download/gcc-15/${host_triple}.tar.xz"
+       local archive_name="${host_triple}-dragonfly.tar.xz"
     elif [[ $target == openbsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Atar/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
-       local archive_name="x86_64-unknown-openbsd.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/Atar/releases/download/gcc-16/${host_triple}.tar.xz"
+       local archive_name="${host_triple}-openbsd.tar.xz"
     else
        local toolchain_url="${TOOLCHAIN_DL}/${toolchain_name}.tar.xz"
        local archive_name="${toolchain_name}.tar.xz"
