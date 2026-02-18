@@ -15,37 +15,41 @@ On Linux, we use musl instead of glibc to avoid `dlopen()`.
 
 ## Cross-Compilation
 
-For BSD targets (FreeBSD, NetBSD, DragonFlyBSD, OpenBSD), you can use either:
+This project supports multiple cross-compilation methods:
 
-1. **Prebuilt musl cross-compilation toolchains** (default with `--dl-toolchain`)
-2. **Zig as a cross-compiler** (recommended with `--use-zig`)
+1. **Prebuilt musl cross-compilation toolchains** (for Linux/BSD, use `--dl-toolchain`)
+2. **Zig as a universal cross-compiler** (recommended, use `--use-zig`)
+3. **Native clang** (for macOS)
+4. **Building musl from source** (default fallback)
 
-### Using Zig for BSD Targets
+### Using Zig for Cross-Compilation (Recommended)
 
-Zig provides a simpler cross-compilation experience for all BSD targets:
+Zig provides the simplest cross-compilation experience for all supported targets:
 
 ```bash
-# NetBSD
+# Linux targets
+./build.sh --use-zig linux x86_64
+./build.sh --use-zig linux aarch64
+./build.sh --use-zig linux armv7
+./build.sh --use-zig linux riscv64
+
+# macOS targets
+./build.sh --use-zig macos x86_64
+./build.sh --use-zig macos aarch64
+
+# BSD targets
 ./build.sh --use-zig netbsd x86_64
-./build.sh --use-zig netbsd aarch64
-
-# FreeBSD
-./build.sh --use-zig freebsd x86_64
 ./build.sh --use-zig freebsd aarch64
-
-# OpenBSD
 ./build.sh --use-zig openbsd x86_64
-./build.sh --use-zig openbsd riscv64
-
-# DragonFlyBSD
 ./build.sh --use-zig dragonfly x86_64
 ```
 
-Benefits of using Zig:
-- Single toolchain for all targets
+**Benefits of using Zig:**
+- Single universal toolchain for all targets (Linux, macOS, BSD)
 - No need to download/maintain separate cross-compilers
-- Simpler setup and better BSD support
-- Automatic fallback to traditional toolchain if unavailable
+- Built-in support for musl libc on Linux
+- Simpler setup with automatic fallback to traditional toolchains
+- Excellent support for all BSD variants
 
 ## Rationale
 

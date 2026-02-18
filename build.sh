@@ -23,7 +23,7 @@ echo -e "${SELAGO}       --clean = removes build & release dirs and cache${NC}"
 echo ""
 echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
 echo -e "${MINT} --dl-toolchain       ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
-echo -e "${MINT} --use-zig            ${BWHITE}= Use Zig for BSD cross-compilation         ${SKY}[${GOLD}USE_ZIG${SKY}]${NC}"
+echo -e "${MINT} --use-zig            ${BWHITE}= Use Zig for cross-compilation (all targets) ${SKY}[${GOLD}USE_ZIG${SKY}]${NC}"
 echo -e "${MINT} --nosig              ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
 echo -e "${MINT} --extra-cflags 'VAL' ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
 echo -e "${MINT} --aggressive         ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
@@ -45,8 +45,9 @@ echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
 echo -e "${ORCHID}  Multiple archs: ${OCHRE}./build.sh linux x86_64,aarch64,armv7${NC}"
 echo -e "${ORCHID}  All archs:      ${OCHRE}./build.sh linux all${NC}"
 echo -e "${ORCHID}  With options:   ${OCHRE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
-echo -e "${ORCHID}  BSD with Zig:   ${OCHRE}./build.sh --use-zig netbsd x86_64${NC}"
-echo -e "${ORCHID}                  ${OCHRE}./build.sh --use-zig freebsd aarch64${NC}"
+echo -e "${ORCHID}  With Zig:       ${OCHRE}./build.sh --use-zig linux armv7${NC}"
+echo -e "${ORCHID}                  ${OCHRE}./build.sh --use-zig macos aarch64${NC}"
+echo -e "${ORCHID}                  ${OCHRE}./build.sh --use-zig freebsd x86_64${NC}"
 echo ""
 }
 
@@ -645,7 +646,7 @@ setup_zig() {
         else
             # Download Zig
             if command -v aria2c >/dev/null 2>&1; then
-                aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${zig_url}" || {
+                aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -o "${cache_archive}" "${zig_url}" || {
                     echo -e "${YELLOW}Failed to download Zig, falling back to traditional toolchain${NC}"
                     return 1
                 }
@@ -688,6 +689,43 @@ setup_zig() {
     
     # Map target_os to zig target OS
     case "$target_os" in
+        linux)
+            # For Linux, we use musl as the libc
+            case "$arch" in
+                x86_64) zig_target="x86_64-linux-musl" ;;
+                aarch64) zig_target="aarch64-linux-musl" ;;
+                armv7) zig_target="armv7-linux-musleabihf" ;;
+                armv6) zig_target="arm-linux-musleabihf" ;;
+                armv5) zig_target="arm-linux-musleabi" ;;
+                i686) zig_target="i686-linux-musl" ;;
+                i586) zig_target="i586-linux-musl" ;;
+                i486) zig_target="i486-linux-musl" ;;
+                riscv64) zig_target="riscv64-linux-musl" ;;
+                riscv32) zig_target="riscv32-linux-musl" ;;
+                powerpc64le) zig_target="powerpc64le-linux-musl" ;;
+                powerpc64) zig_target="powerpc64-linux-musl" ;;
+                powerpc) zig_target="powerpc-linux-musl" ;;
+                mips64el) zig_target="mips64el-linux-musl" ;;
+                mips64) zig_target="mips64-linux-musl" ;;
+                mipsel) zig_target="mipsel-linux-musl" ;;
+                mips) zig_target="mips-linux-musl" ;;
+                s390x) zig_target="s390x-linux-musl" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig Linux cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        macos)
+            case "$arch" in
+                x86_64) zig_target="x86_64-macos" ;;
+                aarch64) zig_target="aarch64-macos" ;;
+                *)
+                    echo -e "${YELLOW}Unsupported architecture for Zig macOS cross-compilation: ${arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
         netbsd)
             case "$arch" in
                 x86_64) zig_target="x86_64-netbsd" ;;
@@ -743,15 +781,60 @@ setup_zig() {
     export CC="${zig_bin} cc -target ${zig_target}"
     export CXX="${zig_bin} c++ -target ${zig_target}"
     
-    # Set host argument for configure
-    host_arg="--host=$(get_musl_toolchain "$arch")"
+    # Set host argument for configure (if get_musl_toolchain returns something)
+    local host_triple=$(get_musl_toolchain "$arch")
+    if [[ -n "$host_triple" ]]; then
+        host_arg="--host=${host_triple}"
+    fi
     
-    # Zig needs static linking flags
-    export CFLAGS="${CFLAGS:-} -std=gnu99"
+    # OS-specific flags
+    case "$target_os" in
+        linux)
+            # For Linux, add static and optimization flags
+            export CFLAGS="${CFLAGS:-} -std=gnu99"
+            ;;
+        macos)
+            # macOS doesn't support static linking, so don't add -static
+            export CFLAGS="${CFLAGS:-} -std=c89"
+            ;;
+        netbsd|freebsd|dragonfly|openbsd)
+            # BSD targets
+            export CFLAGS="${CFLAGS:-} -std=gnu99"
+            ;;
+    esac
     
     echo -e "${GREEN}= Successfully configured Zig for ${zig_target}${NC}"
     
     return 0
+}
+
+# Setup macOS clang compiler
+setup_macos_clang() {
+    # Set minimum version of macOS to 10.13
+    export MACOSX_DEPLOYMENT_TARGET="10.13"
+    export MACOS_TARGET="10.13"
+    export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
+    export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
+    # Use included gettext to avoid reading from other places, like homebrew
+    configure_args=("${configure_args[@]}" "--with-included-gettext")
+
+    # If $arch is aarch64 for mac, target arm64
+    if [[ $arch == aarch64 ]]; then
+        export CFLAGS="-Os -target arm64-apple-macos11 -arch arm64"
+        export CXXFLAGS="${CFLAGS}"
+        export LDFLAGS="${CFLAGS}"
+        host_arg="--host=aarch64-apple-darwin"
+        # Add custom CFLAGS if provided
+        [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+    # If $arch is x86_64 for mac, target Intel mac
+    elif [[ $arch == x86_64 ]]; then
+        export CFLAGS="-Os -target x86_64-apple-macos10.12 -mmacosx-version-min=10.12 -arch x86_64"
+        export CXXFLAGS="${CFLAGS}"
+        export LDFLAGS="${CFLAGS}"
+        host_arg="--host=x86_64-apple-macos10.12"
+        # Add custom CFLAGS if provided
+        [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+    fi
 }
 
 # Parallel patch application
@@ -937,7 +1020,29 @@ build_single_arch() {
     # Platform-specific setup
     if [[ $target == linux ]]; then
         start_timer "setup_toolchain"
-        if . /etc/os-release 2>/dev/null && [[ ${ID:-} == alpine ]]; then
+        
+        # Try Zig first if requested
+        if [[ ${USE_ZIG:-} ]]; then
+            if setup_zig "$arch" "$target"; then
+                echo -e "${GREEN}= Successfully configured Zig for Linux cross-compilation${NC}"
+            else
+                echo -e "${YELLOW}= Zig setup failed, falling back to traditional toolchain${NC}"
+                # Fallback to traditional toolchain
+                if . /etc/os-release 2>/dev/null && [[ ${ID:-} == alpine ]]; then
+                    echo -e "${BWHITE}= Skipping installation of musl (already installed on Alpine)${NC}"
+                elif [[ ${DL_TOOLCHAIN:-} ]]; then
+                    if setup_musl_toolchain "$arch"; then
+                        echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
+                        host_arg="--host=$(get_musl_toolchain "$arch")"
+                        export CFLAGS="-std=gnu17 ${CFLAGS:-}"
+                    else
+                        build_musl_from_source
+                    fi
+                else
+                    build_musl_from_source
+                fi
+            fi
+        elif . /etc/os-release 2>/dev/null && [[ ${ID:-} == alpine ]]; then
             echo -e "${BWHITE}= Skipping installation of musl (already installed on Alpine)${NC}"
         elif [[ ${DL_TOOLCHAIN:-} ]]; then
             # Try to use prebuilt toolchain
@@ -1063,30 +1168,25 @@ build_single_arch() {
         echo -e "${BROWN}= (This is mainly due to non-static libc availability.)${NC}"
 
         if [[ $target == macos ]]; then
-            # Set minimum version of macOS to 10.13
-            export MACOSX_DEPLOYMENT_TARGET="10.13"
-            export MACOS_TARGET="10.13"
-            export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
-            export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
-            # Use included gettext to avoid reading from other places, like homebrew
-            configure_args=("${configure_args[@]}" "--with-included-gettext")
-
-            # If $arch is aarch64 for mac, target arm64
-            if [[ $arch == aarch64 ]]; then
-                export CFLAGS="-Os -target arm64-apple-macos11 -arch arm64"
-                export CXXFLAGS="${CFLAGS}"
-                export LDFLAGS="${CFLAGS}"
-                host_arg="--host=aarch64-apple-darwin"
-                # Add custom CFLAGS if provided
-                [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
-            # If $arch is x86_64 for mac, target Intel mac
-            elif [[ $arch == x86_64 ]]; then
-                export CFLAGS="-Os -target x86_64-apple-macos10.12 -mmacosx-version-min=10.12 -arch x86_64"
-                export CXXFLAGS="${CFLAGS}"
-                export LDFLAGS="${CFLAGS}"
-                host_arg="--host=x86_64-apple-macos10.12"
-                # Add custom CFLAGS if provided
-                [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+            # Try Zig first if requested
+            if [[ ${USE_ZIG:-} ]]; then
+                if setup_zig "$arch" "$target"; then
+                    echo -e "${GREEN}= Successfully configured Zig for macOS cross-compilation${NC}"
+                    
+                    # macOS-specific flags for Zig
+                    export CFLAGS="${CFLAGS:-} -Os"
+                    export LDFLAGS="${LDFLAGS:-}"
+                    configure_args=("${configure_args[@]}" "--with-included-gettext")
+                    
+                    # Add custom CFLAGS if provided
+                    [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+                else
+                    echo -e "${YELLOW}= Zig setup failed, falling back to clang${NC}"
+                    # Fallback to clang
+                    setup_macos_clang
+                fi
+            else
+                setup_macos_clang
             fi
         fi
     fi
