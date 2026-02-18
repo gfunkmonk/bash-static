@@ -305,7 +305,7 @@ normalize_arch() {
 # Get per-architecture default CFLAGS
 get_arch_cflags() {
     local arch=$1
-    if [[ $target != openbsd ]]; then
+    if [[ $target == linux ]]; then
     case "$arch" in
         aarch64) echo "-march=armv8-a" ;;
         armv5) echo "-march=armv5te -mtune=arm946e-s -mfloat-abi=soft" ;;
