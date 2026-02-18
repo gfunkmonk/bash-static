@@ -23,6 +23,7 @@ echo -e "${SELAGO}       --clean = removes build & release dirs and cache${NC}"
 echo ""
 echo -e "${LAGOON}Options:                                                         Environment Variables:${NC}"
 echo -e "${MINT} --dl-toolchain       ${BWHITE}= Use prebuilt musl cross toolchain         ${SKY}[${GOLD}DL_TOOLCHAIN${SKY}]${NC}"
+echo -e "${MINT} --use-zig            ${BWHITE}= Use Zig for BSD cross-compilation         ${SKY}[${GOLD}USE_ZIG${SKY}]${NC}"
 echo -e "${MINT} --nosig              ${BWHITE}= Skip GPG signature verification           ${SKY}[${GOLD}NOSIG${SKY}]${NC}"
 echo -e "${MINT} --extra-cflags 'VAL' ${BWHITE}= Extra flags to append to default CFLAGS   ${SKY}[${GOLD}EXTRA_CFLAGS${SKY}]${NC}"
 echo -e "${MINT} --aggressive         ${BWHITE}= Use aggressive CFLAGS                     ${SKY}[${GOLD}AGGRESSIVE_OPT${SKY}]${NC}"
@@ -44,6 +45,7 @@ echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
 echo -e "${ORCHID}  Multiple archs: ${OCHRE}./build.sh linux x86_64,aarch64,armv7${NC}"
 echo -e "${ORCHID}  All archs:      ${OCHRE}./build.sh linux all${NC}"
 echo -e "${ORCHID}  With options:   ${OCHRE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo -e "${ORCHID}  NetBSD w/ Zig:  ${OCHRE}./build.sh --use-zig netbsd x86_64${NC}"
 echo ""
 }
 
@@ -582,6 +584,132 @@ build_musl_from_source() {
     end_timer "musl_build"
 }
 
+# Download and setup Zig for cross-compilation
+setup_zig() {
+    local arch=$1
+    local zig_version="0.13.0"
+    
+    # Determine host architecture for Zig download
+    local host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local host_arch=$(uname -m)
+    
+    case "$host_os" in
+        linux)
+            case "$host_arch" in
+                x86_64) local zig_host="x86_64-linux" ;;
+                aarch64|arm64) local zig_host="aarch64-linux" ;;
+                armv7*) local zig_host="armv7a-linux" ;;
+                *) 
+                    echo -e "${YELLOW}Unsupported host architecture for Zig: ${host_arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        darwin)
+            case "$host_arch" in
+                x86_64) local zig_host="x86_64-macos" ;;
+                arm64|aarch64) local zig_host="aarch64-macos" ;;
+                *) 
+                    echo -e "${YELLOW}Unsupported host architecture for Zig: ${host_arch}${NC}"
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            echo -e "${YELLOW}Unsupported host OS for Zig: ${host_os}${NC}"
+            return 1
+            ;;
+    esac
+    
+    local zig_dir="${PWD}/zig-${zig_version}"
+    local zig_bin="${zig_dir}/zig"
+    
+    # Check if Zig is already downloaded
+    if [[ -f "$zig_bin" ]]; then
+        echo -e "${LAGOON}= Reusing existing Zig ${zig_version}${NC}"
+    else
+        echo -e "${CANARY}= Downloading Zig ${zig_version} for ${zig_host}${NC}"
+        
+        local zig_url="https://ziglang.org/download/${zig_version}/zig-${zig_host}-${zig_version}.tar.xz"
+        local archive_name="zig-${zig_host}-${zig_version}.tar.xz"
+        local cache_archive="${CACHE_DIR}/${archive_name}"
+        
+        mkdir -p "${CACHE_DIR}"
+        
+        # Check cache
+        if [[ -f "${cache_archive}" ]]; then
+            echo -e "${BWHITE}Using cached Zig: ${archive_name}${NC}"
+            ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
+        else
+            # Download Zig
+            if command -v aria2c >/dev/null 2>&1; then
+                aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${zig_url}" || {
+                    echo -e "${YELLOW}Failed to download Zig, falling back to traditional toolchain${NC}"
+                    return 1
+                }
+            else
+                if ! curl -sSfL --retry 5 --progress-bar "${zig_url}" -o "${cache_archive}"; then
+                    echo -e "${YELLOW}Failed to download Zig, falling back to traditional toolchain${NC}"
+                    return 1
+                fi
+            fi
+            ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
+        fi
+        
+        echo -e "${KHAKI}= Extracting Zig ${zig_version}${NC}"
+        
+        # Extract Zig
+        if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pixz >/dev/null 2>&1; then
+            pixz -d < "$archive_name" | tar -x 2>/dev/null || {
+                echo -e "${RED}ERROR: Failed to extract Zig${NC}" >&2
+                return 1
+            }
+        else
+            tar -xJf "$archive_name" 2>/dev/null || {
+                echo -e "${RED}ERROR: Failed to extract Zig${NC}" >&2
+                return 1
+            }
+        fi
+        
+        # Rename directory to standardized name
+        mv "zig-${zig_host}-${zig_version}" "${zig_dir}" 2>/dev/null || true
+        
+        # Verify Zig binary exists
+        if [[ ! -f "$zig_bin" ]]; then
+            echo -e "${RED}ERROR: Zig extraction failed, binary not found${NC}" >&2
+            return 1
+        fi
+    fi
+    
+    # Determine Zig target triple for cross-compilation
+    local zig_target=""
+    case "$arch" in
+        x86_64) zig_target="x86_64-netbsd" ;;
+        aarch64) zig_target="aarch64-netbsd" ;;
+        i386) zig_target="i386-netbsd" ;;
+        *)
+            echo -e "${YELLOW}Unsupported architecture for Zig NetBSD cross-compilation: ${arch}${NC}"
+            return 1
+            ;;
+    esac
+    
+    echo -e "${BWHITE}= Setting up Zig CC for ${zig_target}${NC}"
+    
+    # Export Zig as the C compiler with target specified
+    export CC="${zig_bin} cc -target ${zig_target}"
+    export CXX="${zig_bin} c++ -target ${zig_target}"
+    
+    # Set host argument for configure
+    host_arg="--host=$(get_musl_toolchain "$arch")"
+    
+    # Zig needs static linking flags
+    export CFLAGS="${CFLAGS:-} -std=gnu99"
+    
+    echo -e "${GREEN}= Successfully configured Zig for ${zig_target}${NC}"
+    
+    return 0
+}
+
 # Parallel patch application
 apply_patches_parallel() {
     local patch_dir=$1
@@ -812,7 +940,27 @@ build_single_arch() {
 
     elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
-        if [[ ${DL_TOOLCHAIN:-} ]]; then
+        
+        # For NetBSD, try Zig first if requested
+        if [[ "${target}" == "netbsd" ]] && [[ ${USE_ZIG:-} ]]; then
+            if setup_zig "$arch"; then
+                echo -e "${GREEN}= Successfully configured Zig for NetBSD cross-compilation${NC}"
+            else
+                echo -e "${YELLOW}= Zig setup failed, falling back to traditional toolchain${NC}"
+                # Fallback to traditional toolchain
+                if [[ ${DL_TOOLCHAIN:-} ]]; then
+                    if setup_musl_toolchain "$arch"; then
+                        echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
+                        host_arg="--host=$(get_musl_toolchain "$arch")"
+                        export CFLAGS="-std=gnu99 ${CFLAGS:-}"
+                    else
+                        build_musl_from_source
+                    fi
+                else
+                    build_musl_from_source
+                fi
+            fi
+        elif [[ ${DL_TOOLCHAIN:-} ]]; then
             # Try to use prebuilt toolchain
             if setup_musl_toolchain "$arch"; then
                 echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
@@ -1063,6 +1211,10 @@ main() {
                 ;;
             --dl-toolchain)
                 export DL_TOOLCHAIN=1
+                shift
+                ;;
+            --use-zig)
+                export USE_ZIG=1
                 shift
                 ;;
             --nosig)

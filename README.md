@@ -13,6 +13,27 @@ anything else but their libcs.
 
 On Linux, we use musl instead of glibc to avoid `dlopen()`.
 
+## Cross-Compilation
+
+For BSD targets (FreeBSD, NetBSD, DragonFlyBSD, OpenBSD), you can use either:
+
+1. **Prebuilt musl cross-compilation toolchains** (default with `--dl-toolchain`)
+2. **Zig as a cross-compiler** (recommended for NetBSD with `--use-zig`)
+
+### Using Zig for NetBSD
+
+Zig provides a simpler cross-compilation experience for NetBSD targets:
+
+```bash
+./build.sh --use-zig netbsd x86_64
+./build.sh --use-zig netbsd aarch64
+```
+
+Benefits of using Zig:
+- Single toolchain for all targets
+- No need to download/maintain separate cross-compilers
+- Simpler setup and better BSD support
+
 ## Rationale
 
 This started as an experiment in Jan 2015 when Glider Labs was testing the
