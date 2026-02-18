@@ -37,3 +37,61 @@ jobs:
         with:
           name: bash-NetBSD-${{ matrix.arch }}
           path: releases/bash-NetBSD-${{ matrix.arch }}
+  freebsd-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            freebsd_version: '14.2'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build bash natively on FreeBSD
+        uses: cross-platform-actions/action@v0.27.0
+        with:
+          operating_system: freebsd
+          version: ${{ matrix.freebsd_version }}
+          shell: bash
+          run: |
+            sudo pkg install -y autoconf gnupg curl
+            ./build.sh freebsd ${{ matrix.arch }} --nosig
+      - name: rename artifact
+        run: |
+          cd releases
+          BASH_FILE=$(ls bash* | head -n 1)
+          mv -v "$BASH_FILE" bash-FreeBSD-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-FreeBSD-${{ matrix.arch }}
+          path: releases/bash-FreeBSD-${{ matrix.arch }}
+  openbsd-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            openbsd_version: '7.6'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build bash natively on OpenBSD
+        uses: cross-platform-actions/action@v0.27.0
+        with:
+          operating_system: openbsd
+          version: ${{ matrix.openbsd_version }}
+          shell: bash
+          run: |
+            sudo pkg_add autoconf gnupg curl
+            ./build.sh openbsd ${{ matrix.arch }} --nosig
+      - name: rename artifact
+        run: |
+          cd releases
+          BASH_FILE=$(ls bash* | head -n 1)
+          mv -v "$BASH_FILE" bash-OpenBSD-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-OpenBSD-${{ matrix.arch }}
+          path: releases/bash-OpenBSD-${{ matrix.arch }}
