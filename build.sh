@@ -830,10 +830,15 @@ build_single_arch() {
 
     elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
-        if [[ ${DL_TOOLCHAIN:-} ]]; then
-            # Try to use prebuilt toolchain
+        local host_os
+        host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        if [[ "$host_os" == "$target" ]]; then
+            # Native build — running directly on the target OS (e.g. on a real NetBSD machine)
+            echo -e "${GREEN}= Native ${target} build — using system compiler${NC}"
+        elif [[ ${DL_TOOLCHAIN:-} ]]; then
+            # Cross-compilation from a different host using a prebuilt toolchain
             if setup_musl_toolchain "$arch"; then
-                echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
+                echo -e "${GREEN}= Successfully configured ${target} cross-compile toolchain${NC}"
 
                 # Set host argument for cross-compilation
                 host_arg="--host=$(get_musl_toolchain "$arch")"
@@ -841,18 +846,21 @@ build_single_arch() {
                 # Add -std=gnu99 for BSD compatibility
                 export CFLAGS="-std=gnu99 ${CFLAGS:-}"
             else
-                # Fallback to building musl if toolchain download fails
-                build_musl_from_source
+                echo -e "${YELLOW}= Toolchain download failed; cannot cross-compile for ${target} on this host${NC}"
+                return 1
             fi
         else
-            build_musl_from_source
+            echo -e "${YELLOW}= No toolchain configured for cross-compiling to ${target}."
+            echo -e "  To cross-compile: pass --dl-toolchain to download a prebuilt cross-compiler."
+            echo -e "  To build natively: run this script on a real ${target} machine.${NC}"
+            return 1
         fi
         end_timer "setup_toolchain"
 
         # BSD-specific flags
         if [[ "${target}" == "netbsd" ]]; then
            export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
-           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition -Wl,-z,relro"
+           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
            configure_args=("${configure_args[@]}" "--disable-nls")
         elif [[ "${target}" == "openbsd" ]]; then
            export CFLAGS="${CFLAGS:-} -Os -ffunction-sections -fdata-sections -fcommon"
