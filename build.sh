@@ -695,7 +695,7 @@ setup_zig() {
                 x86_64) zig_target="x86_64-linux-musl" ;;
                 aarch64) zig_target="aarch64-linux-musl" ;;
                 armv7) zig_target="armv7-linux-musleabihf" ;;
-                armv6) zig_target="arm-linux-musleabihf" ;;
+                armv6) zig_target="arm-linux-musleabi" ;;
                 armv5) zig_target="arm-linux-musleabi" ;;
                 i686) zig_target="i686-linux-musl" ;;
                 i586) zig_target="i586-linux-musl" ;;
