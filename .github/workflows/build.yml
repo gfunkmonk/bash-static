@@ -189,12 +189,81 @@ jobs:
         with:
           name: bash-macos-universal
           path: bash-macos-universal
+  netbsd-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            netbsd_version: '10.1'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build bash natively on NetBSD
+        uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: netbsd
+          version: ${{ matrix.netbsd_version }}
+          shell: bash
+          run: |
+            sudo pkgin -y update
+            sudo pkgin -y install autoconf gnupg2 curl mozilla-rootcerts
+            # Configure GPG to reach keyservers from inside the QEMU VM
+            #mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+            #echo "keyserver hkps://keys.openpgp.org" > ~/.gnupg/gpg.conf
+            #echo "keyserver hkps://keyserver.ubuntu.com" >> ~/.gnupg/gpg.conf
+            ./build.sh netbsd ${{ matrix.arch }} --nosig
+      - name: rename artifact
+        run: |
+          cd releases
+          BASH_FILE=$(ls bash* | head -n 1)
+          mv -v "$BASH_FILE" bash-NetBSD-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-NetBSD-${{ matrix.arch }}
+          path: releases/bash-NetBSD-${{ matrix.arch }}
+  freebsd-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            freebsd_version: '15.0'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build bash natively on FreeBSD
+        uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: freebsd
+          version: ${{ matrix.freebsd_version }}
+          shell: bash
+          run: |
+            sudo pkg install -y autoconf gnupg curl upx
+            # Configure GPG to reach keyservers from inside the QEMU VM
+            #mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+            #echo "keyserver hkps://keys.openpgp.org" > ~/.gnupg/gpg.conf
+            #echo "keyserver hkps://keyserver.ubuntu.com" >> ~/.gnupg/gpg.conf
+            ./build.sh freebsd ${{ matrix.arch }} --nosig
+      - name: rename artifact
+        run: |
+          cd releases
+          BASH_FILE=$(ls bash* | head -n 1)
+          mv -v "$BASH_FILE" bash-FreeBSD-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bash-FreeBSD-${{ matrix.arch }}
+          path: releases/bash-FreeBSD-${{ matrix.arch }}
   release:
     needs:
       - build
       - docker-build
       - misc-build
       - others-build
+      - netbsd-build
+      - freebsd-build
       - macos-universal
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest

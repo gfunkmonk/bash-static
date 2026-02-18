@@ -10,7 +10,7 @@ echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux|macos|dragonfly|freebsd|netbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
@@ -81,7 +81,7 @@ for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${GOLD} OpenBSD (3):${NC}"
+echo -e "${GOLD} OpenBSD (12):${NC}"
 local bsd_archs=$(get_all_archs openbsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
@@ -146,7 +146,11 @@ get_parallel_jobs() {
         # Use all cores for extraction/patching, N-1 for compilation to avoid overload
         nproc
     elif command -v sysctl >/dev/null 2>&1; then
-        sysctl -n hw.physicalcpu
+        if [[ "$target" == "openbsd" ]]; then
+            sysctl -n hw.ncpu
+        else
+            sysctl -n hw.physicalcpu
+        fi
     else
         echo "1"
     fi
@@ -305,7 +309,7 @@ normalize_arch() {
 # Get per-architecture default CFLAGS
 get_arch_cflags() {
     local arch=$1
-    if [[ $target != openbsd ]]; then
+    if [[ $target == linux ]]; then
     case "$arch" in
         aarch64) echo "-march=armv8-a" ;;
         armv5) echo "-march=armv5te -mtune=arm946e-s -mfloat-abi=soft" ;;
@@ -386,8 +390,17 @@ get_musl_toolchain() {
     esac
     elif [[ "${target}" == "openbsd" ]]; then
     case "$arch" in
+        aarch64) echo "aarch64-unknown-openbsd" ;;
+        arm) echo "arm-unknown-openbsd" ;;
+        alpha) echo "alpha-unknown-openbsd" ;;
+        hppa) echo "hppa-unknown-openbsd" ;;
+        i386) echo "i386-unknown-openbsd" ;;
+        mips64) echo "mips64-unknown-openbsd" ;;
+        mips64el) echo "mips64el-unknown-openbsd" ;;
         powerpc) echo "powerpc-unknown-openbsd" ;;
+        powerpc64) echo "powerpc64-unknown-openbsd" ;;
         riscv64) echo "riscv64-unknown-openbsd" ;;
+        sparc64) echo "sparc64-unknown-openbsd" ;;
         x86_64) echo "x86_64-unknown-openbsd" ;;
         *) echo "" ;;
     esac
@@ -414,7 +427,7 @@ get_all_archs() {
             echo "aarch64 i386 x86_64"
             ;;
         openbsd)
-            echo "powerpc riscv64 x86_64"
+            echo "aarch64 arm alpha hppa i386 mips64 mips64el powerpc powerpc64 riscv64 sparc64 x86_64"
             ;;
         *)
             echo ""
@@ -812,7 +825,13 @@ build_single_arch() {
 
     elif [[ $target == freebsd || $target == netbsd || $target == dragonfly || $target == openbsd ]]; then
         start_timer "setup_toolchain"
-        if [[ ${DL_TOOLCHAIN:-} ]]; then
+        local host_os
+        host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        if [[ "$host_os" == "$target" ]]; then
+            # Native build — running directly on the target OS (e.g. on a real NetBSD machine)
+            echo -e "${GREEN}= Native ${target} build — using system compiler${NC}"
+        elif [[ ${DL_TOOLCHAIN:-} ]]; then
+            # Cross-compilation from a different host using a prebuilt toolchain
             # Try to use prebuilt toolchain
             if setup_musl_toolchain "$arch"; then
                 echo -e "${GREEN}= Successfully configured musl toolchain${NC}"
@@ -837,11 +856,11 @@ build_single_arch() {
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition -Wl,-z,relro"
            configure_args=("${configure_args[@]}" "--disable-nls")
         elif [[ "${target}" == "openbsd" ]]; then
-           export CFLAGS="${CFLAGS:-} -Os -ffunction-sections -fdata-sections -fcommon"
+           export CFLAGS="${CFLAGS:-} -Os -ffunction-sections -fdata-sections -fcommon -Wno-discarded-qualifiers -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
            configure_args=("${configure_args[@]}" "--enable-static")
         else
-           export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
+           export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
            configure_args=("${configure_args[@]}")
         fi
@@ -874,8 +893,8 @@ build_single_arch() {
             # Set minimum version of macOS to 10.13
             export MACOSX_DEPLOYMENT_TARGET="10.13"
             export MACOS_TARGET="10.13"
-            export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
-            export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration"
+            export CC="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
+            export CXX="clang -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
             # Use included gettext to avoid reading from other places, like homebrew
             configure_args=("${configure_args[@]}" "--with-included-gettext")
 
@@ -994,7 +1013,7 @@ build_single_arch() {
     fi
 
     # Compress with UPX (skip on macOS or if disabled)
-    if [[ ! ${NO_UPX:-} ]] && [[ "$target" != "macos" ]] && command -v upx >/dev/null 2>&1; then
+    if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
         upx --ultra-brute releases/$OUTPUT_FILE 2>/dev/null || true
