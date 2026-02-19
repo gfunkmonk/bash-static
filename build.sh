@@ -609,13 +609,13 @@ apply_patches_parallel() {
     while IFS= read -r -d '' patch; do
         patches+=("$patch")
     done < <(find "$patch_dir" -maxdepth 1 -name "$patch_pattern" -type f -print0 | sort -z)
-    
+
     if [[ ${#patches[@]} -eq 0 ]]; then
         return 0
     fi
 
     # Apply patches......
-    local display_dir="${patch_dir#$ROOTDIR/}"
+    local display_dir="${patch_dir#"$ROOTDIR"/}"
     echo -e "${AQUA}= Applying patches from ${display_dir}${NC}"
 
     for patch in "${patches[@]}"; do
@@ -981,7 +981,7 @@ build_single_arch() {
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/$OUTPUT_FILE || {
+    cp build/bash-"${bash_version}"/bash releases/"$OUTPUT_FILE" || {
         echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
         popd # project root
         return 1
@@ -991,16 +991,16 @@ build_single_arch() {
     start_timer "strip"
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        "${STRIPCMD}" -s releases/$OUTPUT_FILE 2>/dev/null || true
+        "${STRIPCMD}" -s releases/"$OUTPUT_FILE" 2>/dev/null || true
     elif [[ "$arch" == "mipsel" ]] && [[ "$DL_TOOLCHAIN" != "1" ]]; then
         echo -e "${LIME}= Stripping binary (mipsel)${NC}"
-        mipsel-linux-muslsf-strip -s releases/$OUTPUT_FILE 2>/dev/null || true
+        mipsel-linux-muslsf-strip -s releases/"$OUTPUT_FILE" 2>/dev/null || true
     elif [[ "$target" != "macos" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
-        strip -s releases/$OUTPUT_FILE 2>/dev/null || true
+        strip -s releases/"$OUTPUT_FILE" 2>/dev/null || true
     else
         echo -e "${BLUE}= Stripping binary (macOS)${NC}"
-        strip -S releases/$OUTPUT_FILE 2>/dev/null || true
+        strip -S releases/"$OUTPUT_FILE" 2>/dev/null || true
     fi
     end_timer "strip"
 
@@ -1014,12 +1014,12 @@ build_single_arch() {
     if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
-        upx --ultra-brute releases/$OUTPUT_FILE 2>/dev/null || true
+        upx --ultra-brute releases/"$OUTPUT_FILE" 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]] && [[ ${FORCE_UPX:-} ]]; then
         start_timer "upx"
         echo -e "${VIOLET}= Compressing with UPX on macOS (forced)${NC}"
-        upx --ultra-brute --force-macos releases/$OUTPUT_FILE 2>/dev/null || true
+        upx --ultra-brute --force-macos releases/"$OUTPUT_FILE" 2>/dev/null || true
         end_timer "upx"
     elif [[ "$target" == "macos" ]]; then
         echo -e "${PLUM}= Skipping UPX compression on macOS (currently unsupported)${NC}"
@@ -1035,11 +1035,11 @@ build_single_arch() {
     echo -e "${NAVAJO}=         Build Complete! ✓            =${NC}"
     echo -e "${NAVAJO}========================================${NC}"
     echo -e "${PEACH}  Output: releases/$OUTPUT_FILE${NC}"
-    echo -e "${JUNEBUD}  Size:   $(du -h releases/$OUTPUT_FILE 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
+    echo -e "${JUNEBUD}  Size:   $(du -h releases/"$OUTPUT_FILE" 2>/dev/null | cut -f1 || echo 'unknown')${NC}"
 
     # Show binary info
     if command -v file >/dev/null 2>&1; then
-        echo -e "${ORCHID}  Type:  $(file releases/$OUTPUT_FILE | cut -d: -f2-)${NC}"
+        echo -e "${ORCHID}  Type:  $(file releases/"$OUTPUT_FILE" | cut -d: -f2-)${NC}"
     fi
 
     end_timer "total_build_${arch}"
@@ -1062,7 +1062,7 @@ build_single_arch() {
 
 main() {
     parsed_args=()
-    
+
     # First pass: extract all options, leave positional args in parsed_args
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1199,7 +1199,7 @@ main() {
 
     # Handle 'all' keyword or comma-separated architecture list
     local archs_to_build=()
-    
+
     if [[ $arch_input == "all" ]]; then
         # Build all architectures for the target OS
         local all_archs=$(get_all_archs "$target")
@@ -1222,7 +1222,7 @@ main() {
     if [[ ${#archs_to_build[@]} -gt 1 ]]; then
         echo -e "${BWHITE}Target OS: ${target}${NC}"
         echo -e "${BWHITE}Architectures: ${archs_to_build[*]}${NC}"
-        
+
         local failed_builds=()
         local successful_builds=()
 
