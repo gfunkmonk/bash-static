@@ -887,7 +887,9 @@ build_single_arch() {
         echo -e "${BROWN}= WARNING: Your platform does not support static binaries.${NC}"
         echo -e "${BROWN}= (This is mainly due to non-static libc availability.)${NC}"
 
-        if [[ $target == macos ]]; then
+        OS_NAME=$(uname -s)
+
+        if [[ $target == macos && "$OS_NAME" == "Darwin" ]]; then
             # Set minimum version of macOS to 10.13
             export MACOSX_DEPLOYMENT_TARGET="10.13"
             export MACOS_TARGET="10.13"
@@ -912,7 +914,33 @@ build_single_arch() {
                 host_arg="--host=x86_64-apple-macos10.12"
                 # Add custom CFLAGS if provided
                 [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+           fi
+        elif [[ $target == macos && "$OS_NAME" != "Darwin" ]]; then
+          if command -v zig >/dev/null 2>&1; then
+            # Define targets for Zig
+            if [[ $arch == "x86_64" ]]; then
+                TARGET="x86_64-macos.10.12-none"
+                HOST="x86_64-apple-darwin"
+            elif [[ $arch == "aarch64" ]]; then
+                TARGET="aarch64-macos.11.0-none"
+                HOST="aarch64-apple-darwin"
             fi
+
+            # Set Compiler (Zig is Clang + SDK + Linker)
+            export CC="zig cc -target $TARGET"
+            export CXX="zig c++ -target $TARGET"
+    	  export AR="zig ar"
+	  export RANLIB="zig ranlib"
+            # CRITICAL: Clear these flags!
+            # Zig handles the target/arch/sysroot internally.
+            export CFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
+            export CXXFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
+            export LDFLAGS=""
+            host_arg="--host=$HOST"
+        else
+            echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to macOS!${NC}" >&2
+            return 1
+          fi
         fi
     fi
 
