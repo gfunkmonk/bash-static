@@ -888,7 +888,7 @@ build_single_arch() {
             export RANLIB="zig ranlib"
             export CFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
             export CXXFLAGS="$CFLAGS"
-            export LDFLAGS=""
+            export LDFLAGS="-Wl,--allow-multiple-definition"
             host_arg="--host=$(get_musl_toolchain "$arch")"
             _zig_bsd=1
         else
