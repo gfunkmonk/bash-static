@@ -886,9 +886,9 @@ build_single_arch() {
             export CXX="zig c++ -target $ZIG_TARGET"
             export AR="zig ar"
             export RANLIB="zig ranlib"
-            export CFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
+            export CFLAGS="-Os -static -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
             export CXXFLAGS="$CFLAGS"
-            export LDFLAGS="-Wl,--allow-multiple-definition"
+            export LDFLAGS="-static -Wl,--allow-multiple-definition"
             host_arg="--host=$(get_musl_toolchain "$arch")"
             _zig_bsd=1
         else
