@@ -411,25 +411,25 @@ get_zig_bsd_target() {
     case "$target" in
         freebsd)
             case "$arch" in
-                aarch64) echo "aarch64-freebsd" ;;
-                i386)    echo "x86-freebsd" ;;
-                x86_64)  echo "x86_64-freebsd" ;;
+                aarch64) echo "aarch64-freebsd.13.0" ;;
+                i386)    echo "x86-freebsd.13.0" ;;
+                x86_64)  echo "x86_64-freebsd.13.0" ;;
                 *)       echo "" ;;
             esac
             ;;
         netbsd)
             case "$arch" in
-                aarch64) echo "aarch64-netbsd" ;;
-                i386)    echo "x86-netbsd" ;;
-                x86_64)  echo "x86_64-netbsd" ;;
+                aarch64) echo "aarch64-netbsd.9.0" ;;
+                i386)    echo "x86-netbsd.9.0" ;;
+                x86_64)  echo "x86_64-netbsd.9.0" ;;
                 *)       echo "" ;;
             esac
             ;;
         openbsd)
             case "$arch" in
-                aarch64) echo "aarch64-openbsd" ;;
-                i386)    echo "x86-openbsd" ;;
-                x86_64)  echo "x86_64-openbsd" ;;
+                aarch64) echo "aarch64-openbsd.7.4" ;;
+                i386)    echo "x86-openbsd.7.4" ;;
+                x86_64)  echo "x86_64-openbsd.7.4" ;;
                 *)       echo "" ;;
             esac
             ;;
