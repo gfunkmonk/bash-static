@@ -858,7 +858,7 @@ build_single_arch() {
         local host_os
         host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
         local _zig_bsd_triple=""
-        if [[ $target != "dragonfly" ]] && command -v zig >/dev/null 2>&1; then
+        if [[ $target == "freebsd" ]] && command -v zig >/dev/null 2>&1; then
             _zig_bsd_triple=$(get_zig_bsd_target "$arch")
         fi
         if [[ "$host_os" == "$target" ]]; then
