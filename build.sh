@@ -994,7 +994,12 @@ build_single_arch() {
             export CXXFLAGS="$CFLAGS"
             export LDFLAGS=""
             host_arg="--host=$(get_windows_host_triple "$arch")"
-            configure_args=("${configure_args[@]}" "--disable-nls")
+            configure_args=(
+                "--disable-nls"
+                "ac_cv_type_gid_t=yes"
+                "ac_cv_type_uid_t=yes"
+                "ac_cv_type_clock_t=yes"
+            )
         else
             echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to Windows!${NC}" >&2
             return 1
