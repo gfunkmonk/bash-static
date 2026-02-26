@@ -998,7 +998,7 @@ build_single_arch() {
                 "--disable-nls"
                 "ac_cv_type_gid_t=yes"
                 "ac_cv_type_uid_t=yes"
-                "ac_cv_type_clock_t=yes"
+                "bash_cv_type_clock_t=yes"
             )
         else
             echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to Windows!${NC}" >&2
