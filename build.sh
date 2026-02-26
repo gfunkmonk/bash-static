@@ -30,7 +30,7 @@ echo -e "${MINT} --lto                ${BWHITE}= Enable LTO Optimization        
 echo -e "${MINT} --njobs VAL          ${BWHITE}= Number of parallel jobs (default: auto)   ${SKY}[${GOLD}NJOBS${SKY}]${NC}"
 echo -e "${MINT} --ccache             ${BWHITE}= Use ccache if found                       ${SKY}[${GOLD}USE_CCACHE${SKY}]${NC}"
 echo -e "${MINT} --cache-dir 'DIR'    ${BWHITE}= Dir of cached downloads (default: .cache) ${SKY}[${GOLD}CACHE_DIR${SKY}]${NC}"
-echo -e "${MINT} --p-extract          ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
+echo -e "${MINT} --parallel-extract   ${BWHITE}= Extract archives in parallel              ${SKY}[${GOLD}PARALLEL_EXTRACT${SKY}]${NC}"
 echo -e "${MINT} --no-upx             ${BWHITE}= Skip UPX compression                      ${SKY}[${GOLD}NO_UPX${SKY}]${NC}"
 echo -e "${MINT} --force-upx          ${BWHITE}= Force UPX compression (macOS)             ${SKY}[${GOLD}FORCE_UPX${SKY}]${NC}"
 echo -e "${MINT} --with-tests         ${BWHITE}= Build with tests                          ${SKY}[${GOLD}WITH_TESTS${SKY}]${NC}"
@@ -51,37 +51,43 @@ list-architectures() {
 echo ""
 echo -e "${BWHITE}Available architectures:${NC}"
 echo ""
-echo -e "${CHARTREUSE}  Linux (25):${NC}"
+local count; count=$(get_all_archs linux | wc -w)
+echo -e "${CHARTREUSE} Linux (${count}):${NC}"
 local linux_archs=$(get_all_archs linux)
 for arch in $linux_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${ORCHID}  macOS (2):${NC}"
+local count; count=$(get_all_archs macos | wc -w)
+echo -e "${ORCHID} macOS (${count}):${NC}"
 local macos_archs=$(get_all_archs macos)
 for arch in $macos_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${LIGHTROYAL}  DragonFlyBSD (1):${NC}"
+local count; count=$(get_all_archs dragonfly | wc -w)
+echo -e "${LIGHTROYAL}  DragonFlyBSD (${count}):${NC}"
 local bsd_archs=$(get_all_archs dragonfly)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${VIOLETBLUE}  FreeBSD (3):${NC}"
+local count; count=$(get_all_archs freebsd | wc -w)
+echo -e "${VIOLETBLUE}  FreeBSD (${count}):${NC}"
 local bsd_archs=$(get_all_archs freebsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${PEACH}  NetBSD (3):${NC}"
+local count; count=$(get_all_archs netbsd | wc -w)
+echo -e "${PEACH}  NetBSD (${count}):${NC}"
 local bsd_archs=$(get_all_archs netbsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-echo -e "${GOLD} OpenBSD (10):${NC}"
+local count; count=$(get_all_archs openbsd | wc -w)
+echo -e "${GOLD} OpenBSD (${count}):${NC}"
 local bsd_archs=$(get_all_archs openbsd)
 for arch in $bsd_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
@@ -94,6 +100,7 @@ ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 
 # Color definitions
+[[ -f ./colors.sh ]] || { echo "ERROR: colors.sh not found" >&2; exit 1; }
 source ./colors.sh
 
 # Silence pushd/popd
@@ -646,6 +653,9 @@ generate_checksums() {
 
 # Build for a single architecture
 build_single_arch() {
+    unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD
+    configure_args=(--enable-silent-rules)
+
     local target=$1
     local arch=$2
     local tag=$3
@@ -929,8 +939,8 @@ build_single_arch() {
             # Set Compiler (Zig is Clang + SDK + Linker)
             export CC="zig cc -target $TARGET"
             export CXX="zig c++ -target $TARGET"
-    	  export AR="zig ar"
-	  export RANLIB="zig ranlib"
+            export AR="zig ar"
+            export RANLIB="zig ranlib"
             # CRITICAL: Clear these flags!
             # Zig handles the target/arch/sysroot internally.
             export CFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
@@ -957,6 +967,7 @@ build_single_arch() {
     echo -e "${LIGHTROYAL}  CFLAGS: ${CFLAGS:-none}${NC}"
     echo -e "${TURQUOISE}  LDFLAGS: ${LDFLAGS:-none}${NC}"
     echo -e "${MINT}  Host: ${host_arg:-native}${NC}"
+    echo -e "${HOTPINK}  Configure args:  $configure_args${NC}"
     [[ -f "$STRIPCMD" ]] && echo -e "${SKY}  strip: ${STRIPCMD##*/}${NC}"
     [[ -n ${WITH_TESTS:-} ]] && echo -e " ${BWHITE} Build Tests: ${PINK}yes${NC}" || echo -e " ${BWHITE} Build Tests: ${LIME}no${NC}"
     [[ -n ${USE_CCACHE:-} ]] && echo -e " ${BWHITE} ccache: ${GREEN}enabled${NC}"
@@ -1172,8 +1183,8 @@ main() {
                 export CACHE_DIR=${1#*=}
                 shift
                 ;;
-            --p-extract)
-                export P_EXTRACT=1
+            --parallel-extract)
+                export PARALLEL_EXTRACT=1
                 shift
                 ;;
             --checksum)
