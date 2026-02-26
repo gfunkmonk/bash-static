@@ -412,6 +412,38 @@ get_musl_toolchain() {
     fi
 }
 
+#  Get Zig target triple for BSD cross-compilation
+get_zig_bsd_target() {
+    local arch=$1
+    case "$target" in
+        freebsd)
+            case "$arch" in
+                aarch64) echo "aarch64-freebsd" ;;
+                i386)    echo "x86-freebsd" ;;
+                x86_64)  echo "x86_64-freebsd" ;;
+                *)       echo "" ;;
+            esac
+            ;;
+        netbsd)
+            case "$arch" in
+                aarch64) echo "aarch64-netbsd" ;;
+                i386)    echo "x86-netbsd" ;;
+                x86_64)  echo "x86_64-netbsd" ;;
+                *)       echo "" ;;
+            esac
+            ;;
+        openbsd)
+            case "$arch" in
+                aarch64) echo "aarch64-openbsd" ;;
+                i386)    echo "x86-openbsd" ;;
+                x86_64)  echo "x86_64-openbsd" ;;
+                *)       echo "" ;;
+            esac
+            ;;
+        *) echo "" ;;
+    esac
+}
+
 # Get all supported architectures for a target OS
 get_all_archs() {
     local target=$1
@@ -835,6 +867,10 @@ build_single_arch() {
         start_timer "setup_toolchain"
         local host_os
         host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        local _zig_bsd_triple=""
+        if [[ $target != "dragonfly" ]] && [[ $target != "openbsd" ]] && command -v zig >/dev/null 2>&1; then
+            _zig_bsd_triple=$(get_zig_bsd_target "$arch")
+        fi
         if [[ "$host_os" == "$target" ]]; then
             # Native build — running directly on the target OS (e.g. on a real NetBSD machine)
             echo -e "${GREEN}= Native ${target} build — using system compiler${NC}"
@@ -849,16 +885,30 @@ build_single_arch() {
 
                 # Add -std=gnu99 for BSD compatibility
                 export CFLAGS="-std=gnu99 ${CFLAGS:-}"
-            else
-                # Fallback to building musl if toolchain download fails
-                build_musl_from_source
             fi
+        elif [[ -n "$_zig_bsd_triple" ]]; then
+            local ZIG_TARGET="$_zig_bsd_triple"
+            echo -e "${VIOLET}= Using zig for ${target}/${arch} cross-compilation${NC}"
+            export CC="zig cc -target $ZIG_TARGET"
+            export CXX="zig c++ -target $ZIG_TARGET"
+            export AR="zig ar"
+            export RANLIB="zig ranlib"
+            export CFLAGS="-Os -std=gnu99 -fcommon -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-incompatible-pointer-types-discards-qualifiers"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS="-Wl,-Bstatic -lc"
+            host_arg="--host=$(get_musl_toolchain "$arch")"
+            _zig_bsd=1
+          if [[ "${target}" == "netbsd" ]]; then
+             configure_args=("${configure_args[@]}" "--disable-nls")
+          fi
         else
-            build_musl_from_source
+            echo -e "${TOMATO}= Error can't build! Try dl-toolchain or installing zig.${NC}"
+            return 1
         fi
         end_timer "setup_toolchain"
 
         # BSD-specific flags
+        if [[ -z ${_zig_bsd:-} ]]; then
         if [[ "${target}" == "netbsd" ]]; then
            export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition -Wl,-z,relro"
@@ -871,6 +921,7 @@ build_single_arch() {
            export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
            configure_args=("${configure_args[@]}")
+        fi
         fi
 
         # Add LTO if requested
