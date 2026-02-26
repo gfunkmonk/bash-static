@@ -991,7 +991,7 @@ build_single_arch() {
             export AR="zig ar"
             export RANLIB="zig ranlib"
             export CFLAGS="-Os -std=gnu99 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-incompatible-pointer-types-discards-qualifiers \
-                -D_NO_OLDNAMES -Duid_t=int -Dgid_t=int -Dsigset_t=int \
+                -D_NO_OLDNAMES -DHAVE_GETCWD=1 -Duid_t=int -Dgid_t=int -Dsigset_t=int \
                 -DF_DUPFD=0 -DF_GETFD=1 -DF_SETFD=2 -DF_GETFL=3 -DF_SETFL=4 -DFD_CLOEXEC=1"
             export CXXFLAGS="$CFLAGS"
             export LDFLAGS=""
