@@ -10,7 +10,7 @@ echo ""
 echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}windows${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
@@ -90,6 +90,13 @@ local count; count=$(get_all_archs openbsd | wc -w)
 echo -e "${GOLD} OpenBSD (${count}):${NC}"
 local bsd_archs=$(get_all_archs openbsd)
 for arch in $bsd_archs; do
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
+done
+echo ""
+local count; count=$(get_all_archs windows | wc -w)
+echo -e "${CYAN} Windows (${count}):${NC}"
+local windows_archs=$(get_all_archs windows)
+for arch in $windows_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
@@ -444,6 +451,28 @@ get_zig_bsd_target() {
     esac
 }
 
+# Get Zig target triple for Windows cross-compilation
+get_zig_windows_target() {
+    local arch=$1
+    case "$arch" in
+        x86_64)  echo "x86_64-windows-gnu" ;;
+        aarch64) echo "aarch64-windows-gnu" ;;
+        i386)    echo "x86-windows-gnu" ;;
+        *)       echo "" ;;
+    esac
+}
+
+# Get GNU host triple for Windows cross-compilation
+get_windows_host_triple() {
+    local arch=$1
+    case "$arch" in
+        x86_64)  echo "x86_64-w64-mingw32" ;;
+        aarch64) echo "aarch64-w64-mingw32" ;;
+        i386)    echo "i686-w64-mingw32" ;;
+        *)       echo "" ;;
+    esac
+}
+
 # Get all supported architectures for a target OS
 get_all_archs() {
     local target=$1
@@ -465,6 +494,9 @@ get_all_archs() {
             ;;
         openbsd)
             echo "aarch64 arm alpha hppa i386 mips64 mips64el powerpc powerpc64 riscv64 sparc64 x86_64"
+            ;;
+        windows)
+            echo "x86_64 aarch64 i386"
             ;;
         *)
             echo ""
@@ -944,6 +976,34 @@ build_single_arch() {
         # Add custom CFLAGS if provided
         [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
 
+    elif [[ $target == windows ]]; then
+        start_timer "setup_toolchain"
+        if command -v zig >/dev/null 2>&1; then
+            local ZIG_TARGET
+            ZIG_TARGET=$(get_zig_windows_target "$arch")
+            if [[ -z "$ZIG_TARGET" ]]; then
+                echo -e "${RED}ERROR: No zig target defined for windows/${arch}${NC}" >&2
+                return 1
+            fi
+            echo -e "${VIOLET}= Using zig for windows/${arch} cross-compilation${NC}"
+            export CC="zig cc -target $ZIG_TARGET"
+            export CXX="zig c++ -target $ZIG_TARGET"
+            export AR="zig ar"
+            export RANLIB="zig ranlib"
+            export CFLAGS="-Os -std=gnu99 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-incompatible-pointer-types-discards-qualifiers"
+            export CXXFLAGS="$CFLAGS"
+            export LDFLAGS=""
+            host_arg="--host=$(get_windows_host_triple "$arch")"
+            configure_args=("${configure_args[@]}" "--disable-nls")
+        else
+            echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to Windows!${NC}" >&2
+            return 1
+        fi
+        end_timer "setup_toolchain"
+
+        # Add custom CFLAGS if provided
+        [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+
     else
         echo -e "${BROWN}= WARNING: Your platform does not support static binaries.${NC}"
         echo -e "${BROWN}= (This is mainly due to non-static libc availability.)${NC}"
@@ -1044,7 +1104,15 @@ build_single_arch() {
     fi
 
     # Verify bash binary was built successfully
-    if [[ ! -f bash ]]; then
+    if [[ "$target" == "windows" ]]; then
+        if [[ ! -f bash.exe && ! -f bash ]]; then
+            echo -e "${RED}ERROR: Compilation failed - bash binary not found${NC}" >&2
+            popd # bash-${bash_version}
+            popd # build
+            popd # project root
+            return 1
+        fi
+    elif [[ ! -f bash ]]; then
         echo -e "${RED}ERROR: Compilation failed - bash binary not found${NC}" >&2
         popd # bash-${bash_version}
         popd # build
@@ -1067,21 +1135,36 @@ build_single_arch() {
        export OUTPUT_FILE="bash-${bash_version}-NetBSD-${arch}"
     elif [[ "$target" == "openbsd" ]]; then
        export OUTPUT_FILE="bash-${bash_version}-OpenBSD-${arch}"
+    elif [[ "$target" == "windows" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-Windows-${arch}.exe"
     fi
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/"$OUTPUT_FILE" || {
-        echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
-        popd # project root
-        return 1
-    }
+    if [[ "$target" == "windows" ]]; then
+        local _win_src="build/bash-${bash_version}/bash.exe"
+        [[ ! -f "$_win_src" ]] && _win_src="build/bash-${bash_version}/bash"
+        cp "$_win_src" releases/"$OUTPUT_FILE" || {
+            echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
+            popd # project root
+            return 1
+        }
+    else
+        cp build/bash-"${bash_version}"/bash releases/"$OUTPUT_FILE" || {
+            echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
+            popd # project root
+            return 1
+        }
+    fi
 
     # Strip binary based on architecture and platform
     start_timer "strip"
     if [[ -f "$STRIPCMD" ]]; then
         echo -e "${LIME}= Stripping binary${NC}"
         "${STRIPCMD}" -s releases/"$OUTPUT_FILE" 2>/dev/null || true
+    elif [[ "$target" == "windows" ]]; then
+        echo -e "${LIME}= Stripping binary (Windows)${NC}"
+        zig objcopy --strip-all releases/"$OUTPUT_FILE" 2>/dev/null || true
     elif [[ "$arch" == "mipsel" ]] && [[ "$DL_TOOLCHAIN" != "1" ]]; then
         echo -e "${LIME}= Stripping binary (mipsel)${NC}"
         mipsel-linux-muslsf-strip -s releases/"$OUTPUT_FILE" 2>/dev/null || true
@@ -1101,7 +1184,7 @@ build_single_arch() {
     fi
 
     # Compress with UPX (skip on macOS or if disabled)
-    if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" ]] && command -v upx >/dev/null 2>&1; then
+    if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" || "$target" == "windows" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
         upx --ultra-brute releases/"$OUTPUT_FILE" 2>/dev/null || true
