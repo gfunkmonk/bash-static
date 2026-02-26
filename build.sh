@@ -991,16 +991,14 @@ build_single_arch() {
             export AR="zig ar"
             export RANLIB="zig ranlib"
             export CFLAGS="-Os -std=gnu99 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-incompatible-pointer-types-discards-qualifiers \
+                -D_NO_OLDNAMES -Duid_t=int -Dgid_t=int -Dsigset_t=int \
                 -DF_DUPFD=0 -DF_GETFD=1 -DF_SETFD=2 -DF_GETFL=3 -DF_SETFL=4 -DFD_CLOEXEC=1"
             export CXXFLAGS="$CFLAGS"
             export LDFLAGS=""
             host_arg="--host=$(get_windows_host_triple "$arch")"
             configure_args=(
                 "--disable-nls"
-                "ac_cv_type_uid_t=no"
                 "bash_cv_type_clock_t=yes"
-                "bash_cv_type_sigset_t=no"
-                "ac_cv_func_getcwd=yes"
             )
         else
             echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to Windows!${NC}" >&2
