@@ -66,7 +66,7 @@ jobs:
         cd releases
         BASH_FILE=$(ls bash* | head -n 1)
         mv -v "$BASH_FILE" bash-${{matrix.target}}-${{matrix.arch}}
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: bash-${{matrix.target}}-${{matrix.arch}}
         path: releases/bash-${{matrix.target}}-${{matrix.arch}}
@@ -82,7 +82,7 @@ jobs:
         run: chmod +x artifacts/*/* && ls -al && ls -al artifacts/
       - name: run lipo to create universal binary
         run: lipo -create -arch arm64 artifacts/bash-macos-aarch64/bash-macos-aarch64 -arch x86_64 artifacts/bash-macos-x86_64/bash-macos-x86_64 -output bash-macos-universal
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: bash-macos-universal
           path: bash-macos-universal
