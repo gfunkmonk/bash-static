@@ -75,7 +75,7 @@ jobs:
       - build
     runs-on: macos-latest
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: make executable
