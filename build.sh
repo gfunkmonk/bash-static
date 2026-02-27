@@ -868,7 +868,7 @@ build_single_arch() {
         local host_os
         host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
         local _zig_bsd_triple=""
-        if [[ $target != "dragonfly" ]] && [[ $target != "openbsd" ]] && command -v zig >/dev/null 2>&1; then
+        if [[ $target != "dragonfly" ]] && command -v zig >/dev/null 2>&1; then
             _zig_bsd_triple=$(get_zig_bsd_target "$arch")
         fi
         if [[ "$host_os" == "$target" ]]; then
@@ -896,6 +896,7 @@ build_single_arch() {
             export CFLAGS="-Os -std=gnu99 -fcommon -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-incompatible-pointer-types-discards-qualifiers"
             export CXXFLAGS="$CFLAGS"
             export LDFLAGS="-Wl,-Bstatic -lc"
+
             host_arg="--host=$(get_musl_toolchain "$arch")"
             _zig_bsd=1
           if [[ "${target}" == "netbsd" ]]; then
@@ -994,8 +995,8 @@ build_single_arch() {
             export RANLIB="zig ranlib"
             # CRITICAL: Clear these flags!
             # Zig handles the target/arch/sysroot internally.
-            export CFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
-            export CXXFLAGS="-Os -std=c89 -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses"
+            export CFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-old-style-definition"
+            export CXXFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-old-style-definition"
             export LDFLAGS=""
             host_arg="--host=$HOST"
         else
