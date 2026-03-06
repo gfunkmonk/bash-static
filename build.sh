@@ -978,7 +978,31 @@ build_single_arch() {
                 [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
            fi
         elif [[ $target == macos && "$OS_NAME" != "Darwin" ]]; then
-          if command -v zig >/dev/null 2>&1; then
+          if command -v osxcross-conf >/dev/null 2>&1; then
+          export OSXCROSS_CONF_LOC=$(command -v osxcross-conf)
+          export DARWINVER=$($OSXCROSS_CONF_LOC | grep "OSXCROSS_TARGET=" | sed 's/"//g' | cut -d "=" -f2)
+            if [[ $arch == "x86_64" ]]; then
+                TARGET="x86_64-macos.10.12"
+                HOST="x86_64-apple-darwin"
+                export CC="o64-clang"
+                export CXX="o64-clang++"
+                export LINKER="o64-clang"
+                export AR="x86_64-apple-${DARWINVER}-ar"
+                export RANLIB="x86_64-apple-${DARWINVER}-ranlib"
+            elif [[ $arch == "aarch64" ]]; then
+                TARGET="aarch64-macos.11.0"
+                HOST="aarch64-apple-darwin"
+                export CC="oa64-clang"
+                export CXX="oa64-clang++"
+                export LINKER="oa64-clang"
+                export AR="aarch64-apple-${DARWINVER}-ar"
+                export RANLIB="aarch64-apple-${DARWINVER}-ranlib"
+            fi
+            export WARNFLAGS="-Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-declarations -Wno-deprecated-non-prototype -Wunused-command-line-argument"
+            export CFLAGS="-Os -std=c89 ${WARNFLAGS}"
+            export CXXFLAGS="-Os -std=c89 ${WARNFLAGS}"
+            host_arg="--host=$HOST"
+          elif command -v zig >/dev/null 2>&1; then
             # Define targets for Zig
             if [[ $arch == "x86_64" ]]; then
                 TARGET="x86_64-macos.10.12-none"
@@ -995,12 +1019,13 @@ build_single_arch() {
             export RANLIB="zig ranlib"
             # CRITICAL: Clear these flags!
             # Zig handles the target/arch/sysroot internally.
-            export CFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-old-style-definition"
-            export CXXFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses -Wno-deprecated-non-prototype -Wno-old-style-definition"
+            export WARNFLAGS="-Wno-unguarded-availability-new -Wno-private-extern -Wno-deprecated-non-prototype -Wno-old-style-definition -Wno-deprecated-declarations"
+            export CFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses ${WARNFLAGS}"
+            export CXXFLAGS="-Os -std=c89 -fPIC -Wno-return-type -Wno-implicit-function-declaration -Wno-parentheses ${WARNFLAGS}"
             export LDFLAGS=""
             host_arg="--host=$HOST"
         else
-            echo -e "${RED}ERROR: zig not found! -- zig is required to cross-compile to macOS!${NC}" >&2
+            echo -e "${RED}ERROR: zig/osxcross not found! -- zig/osxcross is required to cross-compile to macOS!${NC}" >&2
             return 1
           fi
         fi
