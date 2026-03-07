@@ -7,7 +7,7 @@ usage() {
     latest=$(basename --suffix .sh "$(readlink version.sh 2>/dev/null || echo "version.sh")")
     bv=${latest##version-}
 echo ""
-echo -e "${LIME}$(basename ${0}) ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
+echo -e "${LIME}$(basename "${0}") ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
 echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
@@ -38,6 +38,9 @@ echo -e "${MINT} --keep-build         ${BWHITE}= Keep build dir on success      
 echo -e "${MINT} --checksum           ${BWHITE}= Generate SHA256 checksums for releases    ${SKY}[${GOLD}GEN_CHECKSUM${SKY}]${NC}"
 echo -e "${MINT} --profile            ${BWHITE}= Build profiling/timing                    ${SKY}[${GOLD}PROFILE_BUILD${SKY}]${NC}"
 echo ""
+echo -e "${ORANGE} macOS cross-compiling:"
+echo -e "${PEACH} --use-osxcross       ${BWHITE}= Cross-compile with osxcross               ${VIOLET}[${AQUA}USE_OSXCROSS${VIOLET}]${NC}"
+echo -e "${PEACH} --use-zig            ${BWHITE}= Cross-compile with zig                    ${VIOLET}[${AQUA}USE_ZIG${VIOLET}]${NC}"
 echo ""
 echo -e "${KHAKI}Examples:${NC}"
 echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
@@ -51,45 +54,46 @@ list-architectures() {
 echo ""
 echo -e "${BWHITE}Available architectures:${NC}"
 echo ""
-local count; count=$(get_all_archs linux | wc -w)
-echo -e "${CHARTREUSE} Linux (${count}):${NC}"
-local linux_archs=$(get_all_archs linux)
-for arch in $linux_archs; do
+local _count _archs
+_count=$(get_all_archs linux | wc -w)
+echo -e "${CHARTREUSE} Linux (${_count}):${NC}"
+_archs=$(get_all_archs linux)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-local count; count=$(get_all_archs macos | wc -w)
-echo -e "${ORCHID} macOS (${count}):${NC}"
-local macos_archs=$(get_all_archs macos)
-for arch in $macos_archs; do
+_count=$(get_all_archs macos | wc -w)
+echo -e "${ORCHID} macOS (${_count}):${NC}"
+_archs=$(get_all_archs macos)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-local count; count=$(get_all_archs dragonfly | wc -w)
-echo -e "${LIGHTROYAL}  DragonFlyBSD (${count}):${NC}"
-local bsd_archs=$(get_all_archs dragonfly)
-for arch in $bsd_archs; do
+_count=$(get_all_archs dragonfly | wc -w)
+echo -e "${LIGHTROYAL}  DragonFlyBSD (${_count}):${NC}"
+_archs=$(get_all_archs dragonfly)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-local count; count=$(get_all_archs freebsd | wc -w)
-echo -e "${VIOLETBLUE}  FreeBSD (${count}):${NC}"
-local bsd_archs=$(get_all_archs freebsd)
-for arch in $bsd_archs; do
+_count=$(get_all_archs freebsd | wc -w)
+echo -e "${VIOLETBLUE}  FreeBSD (${_count}):${NC}"
+_archs=$(get_all_archs freebsd)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-local count; count=$(get_all_archs netbsd | wc -w)
-echo -e "${PEACH}  NetBSD (${count}):${NC}"
-local bsd_archs=$(get_all_archs netbsd)
-for arch in $bsd_archs; do
+_count=$(get_all_archs netbsd | wc -w)
+echo -e "${PEACH}  NetBSD (${_count}):${NC}"
+_archs=$(get_all_archs netbsd)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-local count; count=$(get_all_archs openbsd | wc -w)
-echo -e "${GOLD} OpenBSD (${count}):${NC}"
-local bsd_archs=$(get_all_archs openbsd)
-for arch in $bsd_archs; do
+_count=$(get_all_archs openbsd | wc -w)
+echo -e "${GOLD} OpenBSD (${_count}):${NC}"
+_archs=$(get_all_archs openbsd)
+for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
@@ -98,9 +102,13 @@ echo ""
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/02032026"
 ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
+MUSL_MIRROR="${MUSL_MIRROR:-https://musl.libc.org/releases}"
 
 # Color definitions
-[[ -f ./colors.sh ]] || { echo "ERROR: colors.sh not found" >&2; exit 1; }
+[[ -f ./colors.sh ]] || {
+        echo "ERROR: colors.sh not found" >&2
+        exit 1
+}
 source ./colors.sh
 
 # Silence pushd/popd
@@ -109,7 +117,7 @@ popd() { command popd >/dev/null; }
 
 # Function to clean
 cleanup() {
-read -p "Are you sure you want to delete buid/ releases/ & cache?? (y/n): " -n 1 confirmation
+read -rp "Are you sure you want to delete buid/ releases/ & cache?? (y/n): " -n 1 confirmation
 echo "" # Add a newline after the single character input
 
 if [[ "$confirmation" != 'y' && "$confirmation" != 'Y' ]]; then
@@ -117,10 +125,10 @@ if [[ "$confirmation" != 'y' && "$confirmation" != 'Y' ]]; then
     exit 1
 fi
 
-rm -fr build/
-rm -fr releases/
-rm -fr .cache/
-rm -fr .ccache/
+        rm -fr build/
+        rm -fr releases/
+        rm -fr .cache/
+        rm -fr .ccache/
 
 echo -e "${ORANGE}Cleaned build/, releases/, .cache/, and .ccache/!${NC}"
 
@@ -139,24 +147,26 @@ start_timer() {
 end_timer() {
     if [[ -n ${PROFILE_BUILD:-} ]]; then
         local start=${BUILD_TIMINGS["$1"]:-0}
-        local end=$(date +%s)
-        local elapsed=$((end - start))
+        local _end
+        _end=$(date +%s)
+        local elapsed=$((_end - start))
         echo -e "${SLATE}⏱  $1: ${elapsed}s${NC}"
     fi
 }
 
 # Get number of parallel jobs with better detection
+# Optional arg $1: target OS name (used for BSD sysctl selection)
 get_parallel_jobs() {
+    local _target="${1:-${target:-}}"
     if [[ -n ${NJOBS:-} ]]; then
         echo "$NJOBS"
     elif command -v nproc >/dev/null 2>&1; then
-        # Use all cores for extraction/patching, N-1 for compilation to avoid overload
         nproc
     elif command -v sysctl >/dev/null 2>&1; then
-        if [[ "$target" == "openbsd" ]]; then
+        if [[ "$_target" == "openbsd" ]]; then
             sysctl -n hw.ncpu
         else
-            sysctl -n hw.physicalcpu
+            sysctl -n hw.physicalcpu 2>/dev/null || sysctl -n hw.ncpu
         fi
     else
         echo "1"
@@ -167,7 +177,7 @@ get_parallel_jobs() {
 setup_ccache() {
     if [[ -n ${USE_CCACHE:-} ]] && command -v ccache >/dev/null 2>&1; then
         echo -e "${CANARY}= Setting up ccache${NC}"
-        export CC="ccache ${CC}"
+        export CC="ccache ${CC:-cc}"
         export CCACHE_DIR="${PWD}/.ccache"
         mkdir -p "$CCACHE_DIR"
         ccache -M 2G >/dev/null 2>&1 || true
@@ -223,7 +233,7 @@ mycurl() {
                     return 1
                 }
             else
-                curl -sSfLO --retry 3 -o "${cache_sig}" "${url}.${sig_ext}" || {
+                curl -sSfL --retry 3 -o "${cache_sig}" "${url}.${sig_ext}" || {
                     echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
                     return 1
                 }
@@ -283,33 +293,41 @@ import_gpg_key() {
 normalize_arch() {
     local raw_arch=$1
     if [[ $target == linux ]]; then
-    case "$raw_arch" in
-        arm64|armv8) echo "aarch64" ;;
-        arm|armel|armv6l) echo "armv6" ;;
-        armv7l|armhf) echo "armv7" ;;
-        i386|x32|x86) echo "i686" ;;
-        68000) echo "m68k" ;;
-        mblaze) echo "microblaze" ;;
-        mips32) echo "mips" ;;
-        mips32el) echo "mipsel" ;;
-        openrisc) echo "or1k" ;;
-        ppc) echo "powerpc" ;;
-        ppcle) echo "powerpcle" ;;
-        ppc64) echo "powerpc64" ;;
-        ppc64le) echo "powerpc64le" ;;
-        risc|risc32) echo "riscv32" ;;
-        risc64) echo "riscv64" ;;
-        sh) echo "sh4" ;;
-        x86-64|amd64|x64) echo "x86_64" ;;
-        *) echo "$raw_arch" ;;
-    esac
-    else
-    case "$raw_arch" in
-        arm64|armv8) echo "aarch64" ;;
-        i686|x32|x86) echo "i386" ;;
-        x86-64|amd64|x64) echo "x86_64" ;;
-        *) echo "$raw_arch" ;;
-    esac
+      case "$raw_arch" in
+          arm64|armv8) echo "aarch64" ;;
+          arm|armel|armv6l) echo "armv6" ;;
+          armv7l|armhf) echo "armv7" ;;
+          i386|x32|x86) echo "i686" ;;
+          68000) echo "m68k" ;;
+          mblaze) echo "microblaze" ;;
+          mips32) echo "mips" ;;
+          mips32el) echo "mipsel" ;;
+          openrisc) echo "or1k" ;;
+          ppc) echo "powerpc" ;;
+          ppcle) echo "powerpcle" ;;
+          ppc64) echo "powerpc64" ;;
+          ppc64le) echo "powerpc64le" ;;
+          risc|risc32) echo "riscv32" ;;
+          risc64) echo "riscv64" ;;
+          sh) echo "sh4" ;;
+          x86-64|amd64|x64) echo "x86_64" ;;
+          *) echo "$raw_arch" ;;
+      esac
+    elif [[ $target == macos || $target == freebsd || $target == netbsd ]]; then
+      case "$raw_arch" in
+          arm64|armv8) echo "aarch64" ;;
+          i686|x32|x86) echo "i386" ;;
+          x86-64|amd64|x64) echo "x86_64" ;;
+          *) echo "$raw_arch" ;;
+      esac
+    elif [[ $target == openbsd ]]; then
+      case "$raw_arch" in
+          arm64|armv8) echo "aarch64" ;;
+          arm|armel|armv6l|armv7l|armhf) echo "arm" ;;
+          i686|x32|x86) echo "i386" ;;
+          x86-64|amd64|x64) echo "x86_64" ;;
+          *) echo "$raw_arch" ;;
+      esac
     fi
 }
 
@@ -476,7 +494,8 @@ get_all_archs() {
 # Download and setup musl prebuilt toolchain with caching
 setup_musl_toolchain() {
     local arch=$1
-    local toolchain_name=$(get_musl_toolchain "$arch")
+    local toolchain_name
+    toolchain_name=$(get_musl_toolchain "$arch")
 
     if [[ -z "$toolchain_name" ]]; then
         echo -e "${YELLOW}No prebuilt toolchain available for ${arch}, falling back to building musl${NC}"
@@ -592,7 +611,7 @@ build_musl_from_source() {
         echo -e "${LAGOON}= Reusing existing musl ${musl_version}${NC}"
     else
         echo -e "${CANARY}= Downloading musl ${musl_version}${NC}"
-        mycurl "${musl_mirror}/musl-${musl_version}.tar.gz" asc
+        mycurl "${MUSL_MIRROR}/musl-${musl_version}.tar.gz" asc
 
         echo -e "${KHAKI}= Extracting musl ${musl_version}${NC}"
         rm -rf "musl-${musl_version}"
@@ -615,7 +634,7 @@ build_musl_from_source() {
         pushd "musl-${musl_version}"
 
         ./configure --prefix="${install_dir}" "${configure_args[@]}"
-        make -j"$(get_parallel_jobs)" -s install
+        make -j"$(get_parallel_jobs "$target")" -s install
         popd # musl-${musl_version}
         rm -rf "musl-${musl_version}"
     fi
@@ -704,6 +723,7 @@ build_single_arch() {
     version_file="./version${tag:+-$tag}.sh"
     if [[ ! -f "$version_file" ]]; then
         echo -e "${RED}ERROR: Version file not found: $version_file${NC}" >&2
+        popd # project root
         return 1
     fi
 
@@ -713,6 +733,7 @@ build_single_arch() {
     # Validate required variables
     if [[ -z ${bash_version:-} ]]; then
         echo -e "${RED}ERROR: bash_version not set in $version_file${NC}" >&2
+        popd # project root
         return 1
     fi
 
@@ -728,8 +749,8 @@ build_single_arch() {
         chmod 700 "$GNUPGHOME"
 
         # Import public keys
-        import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || return 2  # bash
-        import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || return 2  # musl
+        import_gpg_key 7C0135FB088AAF6C66C650B9BB5869F064EA74AB || { popd; popd; return 2; }  # bash
+        import_gpg_key 836489290BB6B70F99FFDA0556BCDB593020450F || { popd; popd; return 2; }  # musl
         end_timer "gpg_setup"
     else
         echo -e "${YELLOW}WARNING: Skipping GPG setup (NOSIG is set)${NC}" >&2
@@ -978,7 +999,7 @@ build_single_arch() {
                 [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
            fi
         elif [[ $target == macos && "$OS_NAME" != "Darwin" ]]; then
-          if command -v osxcross-conf >/dev/null 2>&1; then
+          if [[ "$USE_OSXCROSS" == 1 ]] && command -v osxcross-conf >/dev/null 2>&1; then
           export OSXCROSS_CONF_LOC=$(command -v osxcross-conf)
           export DARWINVER=$($OSXCROSS_CONF_LOC | grep "OSXCROSS_TARGET=" | sed 's/"//g' | cut -d "=" -f2)
             if [[ $arch == "x86_64" ]]; then
@@ -1002,7 +1023,7 @@ build_single_arch() {
             export CFLAGS="-Os -std=c89 ${WARNFLAGS}"
             export CXXFLAGS="-Os -std=c89 ${WARNFLAGS}"
             host_arg="--host=$HOST"
-          elif command -v zig >/dev/null 2>&1; then
+          elif [[ "$USE_ZIG" == 1 ]] && command -v zig >/dev/null 2>&1; then
             # Define targets for Zig
             if [[ $arch == "x86_64" ]]; then
                 TARGET="x86_64-macos.10.12-none"
@@ -1054,18 +1075,19 @@ build_single_arch() {
     pushd bash-"${bash_version}"
 
     start_timer "configure"
-    export CPPFLAGS="${CFLAGS}" # Some versions need both set
+    # Pass only preprocessor-relevant flags; full CFLAGS causes issues with -static etc.
+    export CPPFLAGS="${CPPFLAGS:-}"
     autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}" "${host_arg}"
     end_timer "configure"
 
     # Parallel build based on platform
     start_timer "compile"
-    make -j"$(get_parallel_jobs)" -s
+    make -j"$(get_parallel_jobs "$target")" -s
     end_timer "compile"
 
     if [[ -n ${WITH_TESTS:-} ]]; then
         start_timer "tests"
-        make -j"$(get_parallel_jobs)" -s tests
+        make -j"$(get_parallel_jobs "$target")" -s tests
         end_timer "tests"
     fi
 
@@ -1272,6 +1294,14 @@ main() {
                 export PROFILE_BUILD=1
                 shift
                 ;;
+            --use-osxcross)
+                export USE_OSXCROSS=1
+                shift
+                ;;
+            --use-zig)
+                export USE_ZIG=1
+                shift
+                ;;
             --*)
                 # Unknown long option
                 echo -e "${RED}ERROR: Unknown option: $1${NC}" >&2
@@ -1311,8 +1341,6 @@ main() {
         tag=${parsed_args[2]}
     fi
 
-    declare -r musl_mirror='https://musl.libc.org/releases'
-
     # Handle 'all' keyword or comma-separated architecture list
     local archs_to_build=()
 
@@ -1331,7 +1359,9 @@ main() {
         echo -e "${GOLD}=== Building multiple architectures ===${NC}"
     else
         # Single architecture
-        archs_to_build=($(normalize_arch "$arch_input"))
+        local _norm
+        _norm=$(normalize_arch "$arch_input")
+        archs_to_build=("${_norm}")
     fi
 
     # If building multiple architectures, use batch mode
