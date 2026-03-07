@@ -1,0 +1,11 @@
+--- a/bashansi.h
++++ b/bashansi.h
+@@ -36,7 +36,7 @@
+ #endif /* !HAVE_STDLIB_H */
+ 
+ /* If bool is not a compiler builtin, prefer stdbool.h if we have it */
+-#if !defined (HAVE_C_BOOL)
++#if !defined (HAVE_C_BOOL) && !(defined (__STDC_VERSION__) && __STDC_VERSION__ >= 202311L)
+ #  if defined (HAVE_STDBOOL_H)
+ #    include <stdbool.h>
+ #  else
