@@ -2,7 +2,7 @@
 
 bash_version="2.05b"
 bash_patch_level=13
-musl_version="1.2.5"
+musl_version="1.2.6"
 CFLAGS="-std=c89 -Wno-error=implicit-function-declaration -Wno-error=implicit-int"
 NO_SIGS=1
 

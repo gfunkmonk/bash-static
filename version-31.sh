@@ -2,7 +2,7 @@
 
 bash_version="3.1"
 bash_patch_level=23
-musl_version="1.2.5"
+musl_version="1.2.6"
 CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=return-mismatch"
 
 export bash_version

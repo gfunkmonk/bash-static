@@ -1,1 +1,11 @@
-version-53.sh
+#!/bin/bash
+
+bash_version="5.3"
+bash_patch_level=9
+musl_version="1.2.6"
+CFLAGS="-Wno-error=implicit-function-declaration"
+
+export bash_version
+export bash_patch_level
+export musl_version
+export CFLAGS

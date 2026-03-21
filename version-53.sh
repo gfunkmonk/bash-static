@@ -2,7 +2,7 @@
 
 bash_version="5.3"
 bash_patch_level=9
-musl_version="1.2.5"
+musl_version="1.2.6"
 CFLAGS="-Wno-error=implicit-function-declaration"
 
 export bash_version

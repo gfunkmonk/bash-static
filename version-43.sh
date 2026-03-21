@@ -2,7 +2,7 @@
 
 bash_version="4.3"
 bash_patch_level=48
-musl_version="1.2.5"
+musl_version="1.2.6"
 CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=incompatible-pointer-types"
 
 export bash_version
