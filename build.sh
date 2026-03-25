@@ -99,7 +99,7 @@ done
 echo ""
 }
 
-TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/eastwood"
+TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/prevalence"
 ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 MUSL_MIRROR="${MUSL_MIRROR:-https://musl.libc.org/releases}"
