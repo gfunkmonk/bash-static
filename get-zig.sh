@@ -3,7 +3,7 @@
 set -eo pipefail
 
 OS_NAME=$(uname -s)
-OS_ARCH=$(uname -i)
+OS_ARCH=$(uname -m)
 
 if [[ "$OS_NAME" == "Linux" ]] && [[ "$OS_ARCH" == "x86_64" ]]; then
     if command -v apt >/dev/null 2>&1; then
@@ -15,8 +15,13 @@ if [[ "$OS_NAME" == "Linux" ]] && [[ "$OS_ARCH" == "x86_64" ]]; then
     fi
 fi
 
+if [[ -z "${OUTPUT:-}" ]] || [[ -z "${URL:-}" ]]; then
+    echo "ERROR: Unsupported platform: $OS_NAME/$OS_ARCH" >&2
+    exit 1
+fi
+
 if command -v aria2c >/dev/null 2>&1; then
-    aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 -c -o "$OUTPUT" "$URL" || return 1
+    aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 -c -o "$OUTPUT" "$URL" || exit 1
 else
-    curl -L -C - --progress-bar --retry 5 --output "$OUTPUT"  "$URL"
+    curl -L -C - --progress-bar --retry 5 --output "$OUTPUT" "$URL" || exit 1
 fi
