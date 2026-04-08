@@ -55,44 +55,44 @@ echo ""
 echo -e "${BWHITE}Available architectures:${NC}"
 echo ""
 local _count _archs
-_count=$(get_all_archs linux | wc -w)
-echo -e "${CHARTREUSE} Linux (${_count}):${NC}"
 _archs=$(get_all_archs linux)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${CHARTREUSE} Linux (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-_count=$(get_all_archs macos | wc -w)
-echo -e "${ORCHID} macOS (${_count}):${NC}"
 _archs=$(get_all_archs macos)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${ORCHID} macOS (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-_count=$(get_all_archs dragonfly | wc -w)
-echo -e "${LIGHTROYAL}  DragonFlyBSD (${_count}):${NC}"
 _archs=$(get_all_archs dragonfly)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${LIGHTROYAL}  DragonFlyBSD (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-_count=$(get_all_archs freebsd | wc -w)
-echo -e "${VIOLETBLUE}  FreeBSD (${_count}):${NC}"
 _archs=$(get_all_archs freebsd)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${VIOLETBLUE}  FreeBSD (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-_count=$(get_all_archs netbsd | wc -w)
-echo -e "${PEACH}  NetBSD (${_count}):${NC}"
 _archs=$(get_all_archs netbsd)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${PEACH}  NetBSD (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
-_count=$(get_all_archs openbsd | wc -w)
-echo -e "${GOLD} OpenBSD (${_count}):${NC}"
 _archs=$(get_all_archs openbsd)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${GOLD} OpenBSD (${_count}):${NC}"
 for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
@@ -127,7 +127,7 @@ fi
 
         rm -fr build/
         rm -fr releases/
-        rm -fr .cache/
+        rm -fr "${CACHE_DIR:-".cache"}/"
         rm -fr .ccache/
 
 echo -e "${ORANGE}Cleaned build/, releases/, .cache/, and .ccache/!${NC}"
@@ -317,6 +317,11 @@ normalize_arch() {
       case "$raw_arch" in
           arm64|armv8) echo "aarch64" ;;
           i686|x32|x86) echo "i386" ;;
+          x86-64|amd64|x64) echo "x86_64" ;;
+          *) echo "$raw_arch" ;;
+      esac
+    elif [[ $target == dragonfly ]]; then
+      case "$raw_arch" in
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
@@ -679,7 +684,8 @@ apply_patches_parallel() {
     for patch in "${patches[@]}"; do
         echo -e "${CREAM}Applying ${patch##*/}${NC}"
         # Get absolute path to patch
-        local abs_patch=$(cd "$(dirname "$patch")" && pwd)/$(basename "$patch")
+        local abs_patch
+        abs_patch=$(cd "$(dirname "$patch")" && pwd)/$(basename "$patch")
         pushd "$target_dir" >/dev/null
         patch -sp1 --fuzz=4 < "${abs_patch}" || {
             echo -e "${RED}WARNING: Failed to apply patch ${patch##*/}${NC}" >&2
@@ -704,8 +710,7 @@ generate_checksums() {
 
 # Build for a single architecture
 build_single_arch() {
-    unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD
-    configure_args=(--enable-silent-rules)
+    unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD _zig_bsd
 
     local target=$1
     local arch=$2
@@ -942,7 +947,6 @@ build_single_arch() {
         else
            export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
-           configure_args=("${configure_args[@]}")
         fi
         fi
 
@@ -1077,7 +1081,7 @@ build_single_arch() {
     start_timer "configure"
     # Pass only preprocessor-relevant flags; full CFLAGS causes issues with -static etc.
     export CPPFLAGS="${CPPFLAGS:-}"
-    autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}" "${host_arg}"
+    autoconf -f && ./configure --without-bash-malloc "${configure_args[@]}" ${host_arg:+"$host_arg"}
     end_timer "configure"
 
     # Parallel build based on platform
@@ -1322,8 +1326,8 @@ main() {
         esac
     done
 
-    myT=$(uname -s) && dO=$(echo "$myT" | tr '[:upper:]' '[:lower:]')
-    myA=$(uname -m) && dA=$(echo "$myA" | tr '[:upper:]' '[:lower:]')
+    dO=$(uname -s | tr '[:upper:]' '[:lower:]')
+    dA=$(uname -m | tr '[:upper:]' '[:lower:]')
 
     # Extract positional arguments (OS, ARCH, TAG) from parsed_args
     local target=$dO
