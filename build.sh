@@ -111,7 +111,7 @@ echo ""
 }
 
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/birthday"
-WIN_CROSS_RELEASE="${WIN_CROSS_RELEASE:-https://github.com/gfunkmonk/win-cross/releases/download/alpha-1}"
+TOOLCHAIN_WIN_DL="https://github.com/gfunkmonk/win-cross/releases/download/alpha-1"
 ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 MUSL_MIRROR="${MUSL_MIRROR:-https://musl.libc.org/releases}"
@@ -641,7 +641,7 @@ setup_win_toolchain() {
     esac
 
     local archive_name="${toolchain_name}.tar.xz"
-    local toolchain_url="${WIN_CROSS_RELEASE}/${archive_name}"
+    local toolchain_url="${TOOLCHAIN_WIN_DL}/${archive_name}"
     local toolchain_dir="${PWD}/toolchain-${toolchain_name}"
     local toolchain_bin="${toolchain_dir}/bin/${toolchain_name}-gcc"
     local toolchain_strip="${toolchain_dir}/bin/${toolchain_name}-strip"
