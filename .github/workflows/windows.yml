@@ -1,0 +1,94 @@
+name: windows
+
+on: workflow_dispatch
+
+jobs:
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: i686
+          - arch: x86_64
+    steps:
+    - uses: actions/checkout@v6
+    - name: install apt packages
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -qq build-essential gpg upx
+    - name: build (cross from Linux)
+      run: |
+        ./build.sh --dl-win-toolchain --nosig windows ${{ matrix.arch }}
+    - name: rename artifact
+      run: |
+        cd releases
+        BASH_FILE=$(ls bash*.exe | head -n 1)
+        mv -v "$BASH_FILE" bash-windows-${{ matrix.arch }}.exe
+    - uses: actions/upload-artifact@v7
+      with:
+        name: bash-windows-${{ matrix.arch }}
+        path: releases/bash-windows-${{ matrix.arch }}.exe
+
+  native-build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            msys_arch: x86_64
+            msys_env: mingw-w64-x86_64
+          - arch: i686
+            msys_arch: i686
+            msys_env: mingw-w64-i686
+    steps:
+    - uses: actions/checkout@v6
+    - name: install MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          base-devel
+          git
+          gnupg
+          autoconf
+          ${{ matrix.msys_env }}-gcc
+          ${{ matrix.msys_env }}-binutils
+    - name: build (native MSYS2)
+      shell: msys2 {0}
+      run: |
+        ./build.sh --nosig windows ${{ matrix.arch }}
+    - name: rename artifact
+      shell: msys2 {0}
+      run: |
+        cd releases
+        BASH_FILE=$(ls bash*.exe | head -n 1)
+        mv -v "$BASH_FILE" bash-windows-native-${{ matrix.arch }}.exe
+    - uses: actions/upload-artifact@v7
+      with:
+        name: bash-windows-native-${{ matrix.arch }}
+        path: releases/bash-windows-native-${{ matrix.arch }}.exe
+
+  release:
+    needs:
+      - cross-build
+      - native-build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: generate changelog
+        run: ./changelog.sh
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: make executable
+        run: chmod +x artifacts/*/*
+      - name: create release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/*/*
+          body_path: NOTES.txt
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
