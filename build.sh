@@ -1094,7 +1094,8 @@ build_single_arch() {
         end_timer "setup_toolchain"
 
         # Windows-specific flags
-        export CFLAGS="${CFLAGS:-} -Os -std=gnu17 -Wno-implicit-function-declaration -Wno-parentheses"
+        # _POSIX_C_SOURCE=200809L enables POSIX types (sigset_t) in MinGW headers
+        export CFLAGS="${CFLAGS:-} -Os -std=gnu17 -D_POSIX_C_SOURCE=200809L -Wno-implicit-function-declaration -Wno-parentheses"
         export LDFLAGS="${LDFLAGS:-} -static"
 
         # Set the host triplet for cross-compilation

@@ -1,0 +1,32 @@
+# Fix Windows/MinGW cross-compilation errors:
+#
+# 1. externs.h: guard getcwd declaration to avoid conflict with MinGW io.h
+#    which declares getcwd(char*, int) while bash declares getcwd(char*, size_t).
+#    The _POSIX_C_SOURCE=200809L in CFLAGS may also fix this via MinGW header
+#    guards, but this patch provides an explicit safeguard.
+#
+# 2. sig.h: provide sigset_t typedef for MinGW environments where _sigset_t is
+#    available but the POSIX alias sigset_t is not yet defined at inclusion time.
+
+--- a/externs.h
++++ b/externs.h
+@@ -255,4 +255,6 @@ extern char *ansicstr (char *, int, int, int *, int *);
+ extern char *ansiexpand (char *, int, int, int *);
+ 
+ /* declarations for local implementations of standard library functions */
++#if !defined (__MINGW32__)
+ extern char *getcwd (char *, size_t);
++#endif
+
+--- a/sig.h
++++ b/sig.h
+@@ -135,5 +135,9 @@ extern void initialize_signals (int);
+ extern void initialize_terminating_signals (void);
+ 
+ /* block/unblock signals */
++#if defined (__MINGW32__) && !defined (sigset_t)
++typedef _sigset_t sigset_t;
++#endif
++
+ extern int block_trapped_signals (sigset_t *, sigset_t *);
+ extern int unblock_trapped_signals (sigset_t *);
