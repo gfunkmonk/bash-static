@@ -99,7 +99,7 @@ done
 echo ""
 }
 
-TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/ladder"
+TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/birthday"
 ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 MUSL_MIRROR="${MUSL_MIRROR:-https://musl.libc.org/releases}"
