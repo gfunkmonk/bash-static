@@ -1,0 +1,27 @@
+# Guard uid_t, gid_t, and clock_t type redefinitions in config.h.in with
+# #ifndef/#endif to prevent "two or more data types in declaration specifiers"
+# errors when cross-compiling for Windows (MinGW).
+#
+# When configure cannot execute test programs on the target (cross-compilation),
+# it conservatively assumes these POSIX types are not defined and emits
+# unconditional '#define uid_t int' etc. in config.h.  Build-host tools
+# (mksignames.c, signames.c) are compiled by the native host compiler which
+# already has these types as typedefs, causing the conflict.
+#
+# Wrapping with #ifndef/#endif follows the standard autoconf convention for
+# guarding type redefinitions and is safe for all build targets.
+
+--- a/config.h.in
++++ b/config.h.in
+@@ -360,1 +360,3 @@
++#ifndef uid_t
+ #undef uid_t
++#endif
+@@ -363,1 +365,3 @@
++#ifndef gid_t
+ #undef gid_t
++#endif
+@@ -366,1 +369,3 @@
++#ifndef clock_t
+ #undef clock_t
++#endif

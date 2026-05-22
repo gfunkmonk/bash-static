@@ -10,7 +10,7 @@ echo ""
 echo -e "${LIME}$(basename "${0}") ${GREEN}[${BWHITE}OPTIONS${GREEN}] [${BWHITE}OS${GREEN}] [${BWHITE}ARCH${GREEN}] [${BWHITE}TAG${GREEN}]${NC}"
 echo ""
 echo -e "${CREAM}Where:${NC}"
-echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
+echo -e "${JUNEBUD}  OS   ${NAVAJO}-- ${BLUE}[${YELLOW}linux${BLUE}|${YELLOW}macos${BLUE}|${YELLOW}windows${BLUE}|${YELLOW}dragonfly${BLUE}|${YELLOW}freebsd${BLUE}|${YELLOW}netbsd${BLUE}|${YELLOW}openbsd${BLUE}]${NAVAJO} ${BWHITE}defaults to $(uname -s | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}  ARCH ${NAVAJO}-- architecture ${BWHITE}defaults to $(uname -m | tr '[:upper:]' '[:lower:]')${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- accepts comma-separated list: x86_64,aarch64,armv7${NC}"
 echo -e "${TOMATO}       ${NAVAJO}-- use 'all' to build all supported architectures${NC}"
@@ -42,11 +42,15 @@ echo -e "${ORANGE} macOS cross-compiling:"
 echo -e "${PEACH} --use-osxcross       ${BWHITE}= Cross-compile with osxcross               ${VIOLET}[${AQUA}USE_OSXCROSS${VIOLET}]${NC}"
 echo -e "${PEACH} --use-zig            ${BWHITE}= Cross-compile with zig                    ${VIOLET}[${AQUA}USE_ZIG${VIOLET}]${NC}"
 echo ""
+echo -e "${ORANGE} Windows cross-compiling:"
+echo -e "${PEACH} --dl-win-toolchain   ${BWHITE}= Download win-cross mingw toolchain        ${VIOLET}[${AQUA}DL_WIN_TOOLCHAIN${VIOLET}]${NC}"
+echo ""
 echo -e "${KHAKI}Examples:${NC}"
 echo -e "${ORCHID}  Single build:   ${OCHRE}./build.sh linux aarch64${NC}"
 echo -e "${ORCHID}  Multiple archs: ${OCHRE}./build.sh linux x86_64,aarch64,armv7${NC}"
 echo -e "${ORCHID}  All archs:      ${OCHRE}./build.sh linux all${NC}"
 echo -e "${ORCHID}  With options:   ${OCHRE}./build.sh --dl-toolchain --ccache --lto linux x86_64${NC}"
+echo -e "${ORCHID}  Windows build:  ${OCHRE}./build.sh --dl-win-toolchain windows x86_64${NC}"
 echo ""
 }
 
@@ -97,9 +101,17 @@ for arch in $_archs; do
     echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
 done
 echo ""
+_archs=$(get_all_archs windows)
+_count=$(echo "$_archs" | wc -w)
+echo -e "${TURQUOISE} Windows (${_count}):${NC}"
+for arch in $_archs; do
+    echo -e "    ${COOLGRAY}•${NC} ${BROWN}$arch${NC}"
+done
+echo ""
 }
 
 TOOLCHAIN_DL="https://github.com/gfunkmonk/musl-cross/releases/download/birthday"
+TOOLCHAIN_WIN_DL="https://github.com/gfunkmonk/win-cross/releases/download/alpha-1"
 ROOTDIR="${PWD}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
 MUSL_MIRROR="${MUSL_MIRROR:-https://musl.libc.org/releases}"
@@ -333,6 +345,12 @@ normalize_arch() {
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
+    elif [[ $target == windows ]]; then
+      case "$raw_arch" in
+          i386|x32|x86) echo "i686" ;;
+          x86-64|amd64|x64) echo "x86_64" ;;
+          *) echo "$raw_arch" ;;
+      esac
     fi
 }
 
@@ -489,6 +507,9 @@ get_all_archs() {
         openbsd)
             echo "aarch64 arm alpha hppa i386 mips64 mips64el powerpc powerpc64 riscv64 sparc64 x86_64"
             ;;
+        windows)
+            echo "i686 x86_64"
+            ;;
         *)
             echo ""
             ;;
@@ -594,6 +615,85 @@ setup_musl_toolchain() {
     # Verify the compiler exists
     if [[ ! -f "$toolchain_bin" ]]; then
         echo -e "${RED}ERROR: Toolchain extraction failed, compiler not found${NC}" >&2
+        rm -rf "$toolchain_dir"
+        return 1
+    fi
+
+    echo -e "${BWHITE}= Setting CC to ${toolchain_name}-gcc${NC}"
+    export CC="${toolchain_bin}"
+    export PATH="${toolchain_dir}/bin:${PATH}"
+    export STRIPCMD="${toolchain_strip}"
+
+    return 0
+}
+
+# Download and setup win-cross mingw toolchain
+setup_win_toolchain() {
+    local arch=$1
+    local toolchain_name
+    case "$arch" in
+        i686)   toolchain_name="i686-w64-mingw32" ;;
+        x86_64) toolchain_name="x86_64-w64-mingw32" ;;
+        *)
+            echo -e "${RED}ERROR: No win-cross toolchain for arch '${arch}'${NC}" >&2
+            return 1
+            ;;
+    esac
+
+    local archive_name="${toolchain_name}.tar.xz"
+    local toolchain_url="${TOOLCHAIN_WIN_DL}/${archive_name}"
+    local toolchain_dir="${PWD}/toolchain-${toolchain_name}"
+    local toolchain_bin="${toolchain_dir}/bin/${toolchain_name}-gcc"
+    local toolchain_strip="${toolchain_dir}/bin/${toolchain_name}-strip"
+    local cache_archive="${CACHE_DIR}/${archive_name}"
+
+    # Reuse if already extracted
+    if [[ -f "$toolchain_bin" ]]; then
+        echo -e "${LAGOON}= Reusing existing ${toolchain_name} toolchain${NC}"
+        export CC="${toolchain_bin}"
+        export PATH="${toolchain_dir}/bin:${PATH}"
+        export STRIPCMD="${toolchain_strip}"
+        return 0
+    fi
+
+    echo -e "${CANARY}= Downloading win-cross toolchain: ${toolchain_name}${NC}"
+
+    mkdir -p "${CACHE_DIR}"
+    if [[ ! -f "${cache_archive}" ]]; then
+        if command -v aria2c >/dev/null 2>&1; then
+            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide \
+                -d "${CACHE_DIR}" -o "${archive_name}" "${toolchain_url}" || {
+                echo -e "${RED}ERROR: Failed to download win-cross toolchain${NC}" >&2
+                return 1
+            }
+        else
+            curl -sSfL --retry 5 --progress-bar "${toolchain_url}" -o "${cache_archive}" || {
+                echo -e "${RED}ERROR: Failed to download win-cross toolchain${NC}" >&2
+                return 1
+            }
+        fi
+    else
+        echo -e "${BWHITE}Using cached toolchain: ${archive_name}${NC}"
+    fi
+
+    echo -e "${KHAKI}= Extracting ${toolchain_name} toolchain${NC}"
+    mkdir -p "$toolchain_dir"
+    if [[ -n ${PARALLEL_EXTRACT:-} ]] && command -v pixz >/dev/null 2>&1; then
+        pixz -d < "${cache_archive}" | tar -x -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
+            echo -e "${RED}ERROR: Failed to extract win-cross toolchain${NC}" >&2
+            rm -rf "$toolchain_dir"
+            return 1
+        }
+    else
+        tar -xJf "${cache_archive}" -C "$toolchain_dir" --strip-components=1 2>/dev/null || {
+            echo -e "${RED}ERROR: Failed to extract win-cross toolchain${NC}" >&2
+            rm -rf "$toolchain_dir"
+            return 1
+        }
+    fi
+
+    if [[ ! -f "$toolchain_bin" ]]; then
+        echo -e "${RED}ERROR: win-cross toolchain extraction failed, compiler not found${NC}" >&2
         rm -rf "$toolchain_dir"
         return 1
     fi
@@ -970,6 +1070,45 @@ build_single_arch() {
         # Add custom CFLAGS if provided
         [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
 
+    elif [[ $target == windows ]]; then
+        start_timer "setup_toolchain"
+        local _host_os
+        _host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        if [[ "$_host_os" == "mingw"* || "$_host_os" == "msys"* || "$_host_os" == "cygwin"* ]]; then
+            # Native Windows build (MSYS2/Cygwin) — use system MinGW compiler
+            echo -e "${GREEN}= Native Windows build — using system MinGW compiler${NC}"
+            case "$arch" in
+                i686)   export CC="i686-w64-mingw32-gcc" ;;
+                x86_64) export CC="x86_64-w64-mingw32-gcc" ;;
+            esac
+            export STRIPCMD="${arch}-w64-mingw32-strip"
+        elif [[ ${DL_WIN_TOOLCHAIN:-} ]]; then
+            setup_win_toolchain "$arch" || {
+                echo -e "${RED}ERROR: Failed to set up win-cross toolchain${NC}" >&2
+                popd; popd; return 1
+            }
+        else
+            echo -e "${RED}ERROR: Windows cross-compilation requires --dl-win-toolchain or running under MSYS2/Cygwin${NC}" >&2
+            popd; popd; return 1
+        fi
+        end_timer "setup_toolchain"
+
+        # Windows-specific flags
+        # _POSIX_C_SOURCE=200809L enables POSIX types (sigset_t) in MinGW headers
+        export CFLAGS="${CFLAGS:-} -Os -std=gnu17 -D_POSIX_C_SOURCE=200809L -Wno-implicit-function-declaration -Wno-parentheses"
+        export LDFLAGS="${LDFLAGS:-} -static"
+
+        # Set the host triplet for cross-compilation
+        case "$arch" in
+            i686)   host_arg="--host=i686-w64-mingw32" ;;
+            x86_64) host_arg="--host=x86_64-w64-mingw32" ;;
+        esac
+
+        configure_args=("${configure_args[@]}" "--with-included-gettext")
+
+        # Add custom CFLAGS if provided
+        [[ -n ${EXTRA_CFLAGS:-} ]] && export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
+
     else
         echo -e "${BROWN}= WARNING: Your platform does not support static binaries.${NC}"
         echo -e "${BROWN}= (This is mainly due to non-static libc availability.)${NC}"
@@ -1096,7 +1235,9 @@ build_single_arch() {
     fi
 
     # Verify bash binary was built successfully
-    if [[ ! -f bash ]]; then
+    local bash_bin="bash"
+    [[ "$target" == "windows" ]] && bash_bin="bash.exe"
+    if [[ ! -f "$bash_bin" ]]; then
         echo -e "${RED}ERROR: Compilation failed - bash binary not found${NC}" >&2
         popd # bash-${bash_version}
         popd # build
@@ -1119,11 +1260,13 @@ build_single_arch() {
        export OUTPUT_FILE="bash-${bash_version}-NetBSD-${arch}"
     elif [[ "$target" == "openbsd" ]]; then
        export OUTPUT_FILE="bash-${bash_version}-OpenBSD-${arch}"
+    elif [[ "$target" == "windows" ]]; then
+       export OUTPUT_FILE="bash-${bash_version}-Windows-${arch}.exe"
     fi
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
     mkdir -p releases
-    cp build/bash-"${bash_version}"/bash releases/"$OUTPUT_FILE" || {
+    cp build/bash-"${bash_version}"/"${bash_bin}" releases/"$OUTPUT_FILE" || {
         echo -e "${RED}ERROR: Failed to copy bash binary to releases/${NC}" >&2
         popd # project root
         return 1
@@ -1153,7 +1296,7 @@ build_single_arch() {
     fi
 
     # Compress with UPX (skip on macOS or if disabled)
-    if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" ]] && command -v upx >/dev/null 2>&1; then
+    if [[ ! ${NO_UPX:-} ]] && [[ "$target" == "linux" || "$target" == "windows" ]] && command -v upx >/dev/null 2>&1; then
         start_timer "upx"
         echo -e "${ORANGE}= Compressing with UPX${NC}"
         upx --ultra-brute releases/"$OUTPUT_FILE" 2>/dev/null || true
@@ -1304,6 +1447,10 @@ main() {
                 ;;
             --use-zig)
                 export USE_ZIG=1
+                shift
+                ;;
+            --dl-win-toolchain)
+                export DL_WIN_TOOLCHAIN=1
                 shift
                 ;;
             --*)
