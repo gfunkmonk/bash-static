@@ -1061,6 +1061,10 @@ build_single_arch() {
        host_arg="--host=mipsel-unknown-linux-muslsf"
     fi
 
+    if [[ -n $HOST_ARG ]]; then
+       host_arg="--host=$HOST_ARG"
+    fi
+
     # Setup ccache if available
     setup_ccache || true
 
