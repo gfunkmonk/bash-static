@@ -201,7 +201,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build bash natively on NetBSD
-        uses: cross-platform-actions/action@v1.2.0
+        uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: netbsd
           version: ${{ matrix.netbsd_version }}
@@ -235,7 +235,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build bash natively on FreeBSD
-        uses: cross-platform-actions/action@v1.2.0
+        uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: freebsd
           version: ${{ matrix.freebsd_version }}
