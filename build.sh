@@ -354,6 +354,7 @@ get_arch_cflags() {
         mipsel) echo "-march=mips32 -mplt -mabi=32" ;;
         mips64) echo "-march=mips64 -mabi=64" ;;
         mips64el) echo "-mplt -mabi=64" ;;
+        or1k) echo "-O0" ;;
         powerpc) echo "-mpowerpc -m32" ;;
         powerpcle) echo "-m32" ;;
         powerpc64) echo "-mpowerpc64 -m64 -falign-functions=32 -falign-labels=32 -falign-loops=32 -falign-jumps=32" ;;
