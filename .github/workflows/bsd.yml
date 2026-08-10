@@ -19,7 +19,7 @@ jobs:
         with:
           operating_system: netbsd
           version: ${{ matrix.netbsd_version }}
-          shell: cpa.sh {0}
+          shell: bash
           run: |
             sudo pkgin -y update
             sudo pkgin -y install autoconf gnupg2 curl mozilla-rootcerts upx coreutils
@@ -53,7 +53,7 @@ jobs:
         with:
           operating_system: freebsd
           version: ${{ matrix.freebsd_version }}
-          shell: cpa.sh {0}
+          shell: bash
           run: |
             sudo pkg install -y autoconf gnupg curl
             # Configure GPG to reach keyservers from inside the QEMU VM
@@ -86,7 +86,7 @@ jobs:
         with:
           operating_system: openbsd
           version: ${{ matrix.openbsd_version }}
-          shell: cpa.sh {0}
+          shell: bash
           run: |
             sudo pkg_add autoconf-2.72p0 gnupg curl
             # Configure GPG to reach keyservers from inside the QEMU VM
@@ -119,7 +119,7 @@ jobs:
         with:
           operating_system: dragonflybsd
           version: ${{ matrix.dragonflybsd_version }}
-          shell: cpa.sh {0}
+          shell: bash
           run: |
             sudo pkg install -y autoconf gnupg curl
             # Configure GPG to reach keyservers from inside the QEMU VM
