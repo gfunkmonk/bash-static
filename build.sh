@@ -955,8 +955,13 @@ build_single_arch() {
            configure_args=("${configure_args[@]}" "--disable-nls")
         elif [[ "${target}" == "openbsd" ]]; then
            export CFLAGS="${CFLAGS:-} -Os -ffunction-sections -fdata-sections -fcommon -Wno-discarded-qualifiers -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
-           export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
-           configure_args=("${configure_args[@]}" "--enable-static")
+           export LDFLAGS="${LDFLAGS:-} -static -Wl,--gc-sections -Wl,--allow-multiple-definition"
+           export LIBS="-lncurses"
+           configure_args=("${configure_args[@]}"
+               "--enable-static"
+               "--disable-nls"
+               "--with-curses"
+           )
         else
            export CFLAGS="${CFLAGS:-} -Os -static -ffunction-sections -fdata-sections -Wno-discarded-qualifiers -Wno-implicit-function-declaration -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-parentheses"
            export LDFLAGS="${LDFLAGS:-} -Wl,--gc-sections -Wl,--allow-multiple-definition"
