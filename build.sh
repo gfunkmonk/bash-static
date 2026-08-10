@@ -1191,10 +1191,10 @@ build_single_arch() {
             armv6)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
             armv7)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
             i386|i486|i586|i686) [[ $file_out == *"Intel 80386"* || $file_out == *"i386"* ]] && arch_ok=true ;;
-            mips)         [[ $file_out == *"MIPS"*       && $file_out != *"MIPS64"*      ]] && arch_ok=true ;;
-            mipsel)       [[ $file_out == *"MIPS"*       && $file_out == *"LSB"*         ]] && arch_ok=true ;;
-            mips64)       [[ $file_out == *"MIPS64"*     && $file_out != *"LSB"*         ]] && arch_ok=true ;;
-            mips64el)     [[ $file_out == *"MIPS64"*     && $file_out == *"LSB"*         ]] && arch_ok=true ;;
+            mips)         [[ $file_out == *"MIPS"*  && $file_out != *"64-bit"* && $file_out != *"MIPS64"* && $file_out != *"MIPS-III"* && $file_out != *"MIPS-IV"* && $file_out == *"MSB"* ]] && arch_ok=true ;;
+            mipsel)       [[ $file_out == *"MIPS"*  && $file_out != *"64-bit"* && $file_out != *"MIPS64"* && $file_out != *"MIPS-III"* && $file_out != *"MIPS-IV"* && $file_out == *"LSB"* ]] && arch_ok=true ;;
+            mips64)       [[ $file_out == *"MIPS"*  && $file_out == *"64-bit"* && ($file_out == *"MIPS64"* || $file_out == *"MIPS-III"* || $file_out == *"MIPS-IV"*) && $file_out == *"MSB"* ]] && arch_ok=true ;;
+            mips64el)     [[ $file_out == *"MIPS"*  && $file_out == *"64-bit"* && ($file_out == *"MIPS64"* || $file_out == *"MIPS-III"* || $file_out == *"MIPS-IV"*) && $file_out == *"LSB"* ]] && arch_ok=true ;;
             powerpc)      [[ $file_out == *"PowerPC"*    && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
             powerpcle)    [[ $file_out == *"PowerPC"*    && $file_out == *"LSB"*         ]] && arch_ok=true ;;
             powerpc64)    [[ $file_out == *"PowerPC"*    && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
