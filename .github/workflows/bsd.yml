@@ -112,36 +112,36 @@ jobs:
         with:
           name: bash-OpenBSD-${{ matrix.arch }}
           path: releases/bash-OpenBSD-${{ matrix.arch }}
-#  dragonflybsd-build:
-#    runs-on: ubuntu-latest
-#    permissions:
-#      contents: read
-#    strategy:
-#      matrix:
-#        include:
-#          - arch: x86_64
-#            dragonflybsd_version: '6.4.2'
-#    steps:
-#      - uses: actions/checkout@v7
-#      - name: Build bash natively on DragonflyBSD
-#        uses: cross-platform-actions/action@v1.3.0
-#        with:
-#          operating_system: dragonflybsd
-#          version: ${{ matrix.dragonflybsd_version }}
-#          shell: bash
-#          run: |
-#            sudo pkg install -y autoconf gnupg curl
+  dragonflybsd-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            dragonflybsd_version: '6.4.2'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build bash natively on DragonflyBSD
+        uses: cross-platform-actions/action@master
+        with:
+          operating_system: dragonflybsd
+          version: ${{ matrix.dragonflybsd_version }}
+          shell: bash
+          run: |
+            sudo pkg install -y autoconf gnupg curl
             # Configure GPG to reach keyservers from inside the QEMU VM
             #mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
             #echo "keyserver hkps://keys.openpgp.org" > ~/.gnupg/gpg.conf
             #echo "keyserver hkps://keyserver.ubuntu.com" >> ~/.gnupg/gpg.conf
-#            ./build.sh dragonfly ${{ matrix.arch }} --nosig
-#      - name: rename artifact
-#        run: |
-#          cd releases
-#          BASH_FILE=$(ls bash* | head -n 1)
-#          mv -v "$BASH_FILE" bash-DragonFlyBSD-${{ matrix.arch }}
-#      - uses: actions/upload-artifact@v7
-#        with:
-#          name: bash-DragonFlyBSD-${{ matrix.arch }}
-#          path: releases/bash-DragonFlyBSD-${{ matrix.arch }}
+            ./build.sh dragonfly ${{ matrix.arch }} --nosig
+      - name: rename artifact
+        run: |
+          cd releases
+          BASH_FILE=$(ls bash* | head -n 1)
+          mv -v "$BASH_FILE" bash-DragonFlyBSD-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bash-DragonFlyBSD-${{ matrix.arch }}
+          path: releases/bash-DragonFlyBSD-${{ matrix.arch }}
