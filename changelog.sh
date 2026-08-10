@@ -1,8 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # generate changelog text
 
-# read version information
-. version.sh
+set -eo pipefail
 
-# and just output to NOTES.txt
-echo "bash ${bash_version}-$(printf '%03d' $bash_patch_level), with musl ${musl_version}" > NOTES.txt
+# read version information
+. ./version.sh
+
+# output release notes to NOTES.txt
+printf 'bash %s-%03d, with musl %s\n' \
+    "${bash_version}" "${bash_patch_level}" "${musl_version}" > NOTES.txt

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 bash_version="5.3"
-bash_patch_level=12
+bash_patch_level=15
 musl_version="1.2.6"
 CFLAGS="-Wno-error=implicit-function-declaration"
 

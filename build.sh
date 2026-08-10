@@ -117,11 +117,11 @@ popd() { command popd >/dev/null; }
 
 # Function to clean
 cleanup() {
-read -rp "Are you sure you want to delete buid/ releases/ & cache?? (y/n): " -n 1 confirmation
+read -rp "Are you sure you want to delete build/ releases/ & cache? (y/n): " -n 1 confirmation
 echo "" # Add a newline after the single character input
 
 if [[ "$confirmation" != 'y' && "$confirmation" != 'Y' ]]; then
-    echo "${SLATE}Operation cancelled.${NC}"
+    echo -e "${SLATE}Operation cancelled.${NC}"
     exit 1
 fi
 
@@ -197,8 +197,11 @@ mycurl() {
     # Create cache directory
     mkdir -p "${CACHE_DIR}"
 
-    # Check cache first
-    local cache_file="${CACHE_DIR}/${filename}"
+    # Check cache first — use absolute paths for symlinks so they resolve correctly
+    # regardless of working directory
+    local abs_cache_dir
+    abs_cache_dir=$(mkdir -p "${CACHE_DIR}" && cd "${CACHE_DIR}" && pwd)
+    local cache_file="${abs_cache_dir}/${filename}"
     if [[ -f ${cache_file} ]]; then
         echo -e "${BWHITE}Using cached: ${filename}${NC}"
         ln -sf "${cache_file}" "${filename}" 2>/dev/null || cp "${cache_file}" "${filename}"
@@ -209,7 +212,7 @@ mycurl() {
 
         # Use aria2c if available for faster downloads
         if command -v aria2c >/dev/null 2>&1; then
-            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_file}")" -o "$(basename "${cache_file}")" "$url" || return 1
+            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${abs_cache_dir}" -o "${filename}" "$url" || return 1
         else
             curl -sSfL --progress-bar --retry 5 -o "${cache_file}" "$url" || return 1
         fi
@@ -220,7 +223,7 @@ mycurl() {
 
     # Handle signature verification
     if [[ ! ${NOSIG:-} ]]; then
-        local cache_sig="${CACHE_DIR}/${filename}.${sig_ext}"
+        local cache_sig="${abs_cache_dir}/${filename}.${sig_ext}"
 
         # Download signature file if not cached
         if [[ ! -f ${cache_sig} ]]; then
@@ -228,7 +231,7 @@ mycurl() {
             echo -e "${GOLD}  URL: ${url}.${sig_ext}${NC}"
 
             if command -v aria2c >/dev/null 2>&1; then
-                aria2c --max-tries=3 --retry-wait=4 -x 4 --summary-interval=0 --download-result=hide -d "$(dirname "${cache_sig}")" -o "$(basename "${cache_sig}")" "${url}.${sig_ext}" || {
+                aria2c --max-tries=3 --retry-wait=4 -x 4 --summary-interval=0 --download-result=hide -d "${abs_cache_dir}" -o "${filename}.${sig_ext}" "${url}.${sig_ext}" || {
                     echo -e "${RED}ERROR: Failed to download signature file${NC}" >&2
                     return 1
                 }
@@ -290,12 +293,16 @@ import_gpg_key() {
 }
 
 # Normalize architecture names
+# Usage: normalize_arch <arch> [<target-os>]
+# Falls back to the global $target if second arg is omitted.
 normalize_arch() {
     local raw_arch=$1
-    if [[ $target == linux ]]; then
+    local _norm_target="${2:-${target:-}}"
+    if [[ $_norm_target == linux ]]; then
       case "$raw_arch" in
           arm64|armv8) echo "aarch64" ;;
-          arm|armel|armv6l) echo "armv6" ;;
+          arm|armel|armv5t|armv5te) echo "armv5" ;;
+          arm6|armv6l) echo "armv6" ;;
           armv7l|armhf) echo "armv7" ;;
           i386|x32|x86) echo "i686" ;;
           68000) echo "m68k" ;;
@@ -313,19 +320,19 @@ normalize_arch() {
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
-    elif [[ $target == macos || $target == freebsd || $target == netbsd ]]; then
+    elif [[ $_norm_target == macos || $_norm_target == freebsd || $_norm_target == netbsd ]]; then
       case "$raw_arch" in
           arm64|armv8) echo "aarch64" ;;
           i686|x32|x86) echo "i386" ;;
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
-    elif [[ $target == dragonfly ]]; then
+    elif [[ $_norm_target == dragonfly ]]; then
       case "$raw_arch" in
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
-    elif [[ $target == openbsd ]]; then
+    elif [[ $_norm_target == openbsd ]]; then
       case "$raw_arch" in
           arm64|armv8) echo "aarch64" ;;
           arm|armel|armv6l|armv7l|armhf) echo "arm" ;;
@@ -333,6 +340,8 @@ normalize_arch() {
           x86-64|amd64|x64) echo "x86_64" ;;
           *) echo "$raw_arch" ;;
       esac
+    else
+      echo "$raw_arch"
     fi
 }
 
@@ -553,25 +562,29 @@ setup_musl_toolchain() {
 
     local cache_archive="${CACHE_DIR}/${archive_name}"
 
-    # Check cache
+    # Check cache — resolve to absolute path for reliable symlinks
+    local abs_cache_dir
+    abs_cache_dir=$(mkdir -p "${CACHE_DIR}" && cd "${CACHE_DIR}" && pwd)
+    local abs_cache_archive="${abs_cache_dir}/${archive_name}"
+
     mkdir -p "${CACHE_DIR}"
-    if [[ -f "${cache_archive}" ]]; then
+    if [[ -f "${abs_cache_archive}" ]]; then
         echo -e "${BWHITE}Using cached toolchain: ${archive_name}${NC}"
-        ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
+        ln -sf "${abs_cache_archive}" "${archive_name}" 2>/dev/null || cp "${abs_cache_archive}" "${archive_name}"
     else
         # Download toolchain
         if command -v aria2c >/dev/null 2>&1; then
-            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${CACHE_DIR}" -o "${archive_name}" "${toolchain_url}" || {
+            aria2c --max-tries=5 --retry-wait=10 -x 8 -s 8 --summary-interval=0 --download-result=hide -d "${abs_cache_dir}" -o "${archive_name}" "${toolchain_url}" || {
                 echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
                 return 1
             }
         else
-            if ! curl -sSfL --retry 5 --progress-bar "${toolchain_url}" -o "${cache_archive}"; then
+            if ! curl -sSfL --retry 5 --progress-bar "${toolchain_url}" -o "${abs_cache_archive}"; then
                 echo -e "${YELLOW}Failed to download toolchain from github, falling back to building musl${NC}"
                 return 1
             fi
         fi
-        ln -sf "${cache_archive}" "${archive_name}" 2>/dev/null || cp "${cache_archive}" "${archive_name}"
+        ln -sf "${abs_cache_archive}" "${archive_name}" 2>/dev/null || cp "${abs_cache_archive}" "${archive_name}"
     fi
 
     echo -e "${KHAKI}= Extracting ${toolchain_name} toolchain${NC}"
@@ -722,8 +735,7 @@ build_single_arch() {
     start_timer "total_build_${arch}"
 
     # Ensure we are in the project root
-    local script_dir="${0%/*}"
-    pushd "$script_dir"
+    pushd "$ROOTDIR"
 
     # Load version info
     version_file="./version${tag:+-$tag}.sh"
@@ -1355,7 +1367,8 @@ main() {
 
     if [[ $arch_input == "all" ]]; then
         # Build all architectures for the target OS
-        local all_archs=$(get_all_archs "$target")
+        local all_archs
+        all_archs=$(get_all_archs "$target")
         if [[ -z $all_archs ]]; then
             echo -e "${RED}ERROR: No architectures defined for target '${target}'${NC}" >&2
             exit 1
@@ -1369,7 +1382,7 @@ main() {
     else
         # Single architecture
         local _norm
-        _norm=$(normalize_arch "$arch_input")
+        _norm=$(normalize_arch "$arch_input" "$target")
         archs_to_build=("${_norm}")
     fi
 
@@ -1382,7 +1395,7 @@ main() {
         local successful_builds=()
 
         for arch in "${archs_to_build[@]}"; do
-            arch=$(normalize_arch "$arch")
+            arch=$(normalize_arch "$arch" "$target")
             echo -e "\n${VIOLET}=== Building for ${arch} ===${NC}\n"
 
             if build_single_arch "$target" "$arch" "$tag"; then
