@@ -544,13 +544,13 @@ setup_musl_toolchain() {
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
 
     if [[ $target == netbsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/netbsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/netbsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
        local archive_name="x86_64-unknown-netbsd.tar.xz"
     elif [[ $target == freebsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/freebsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/freebsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
        local archive_name="x86_64-unknown-freebsd.tar.xz"
     elif [[ $target == dragonfly ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/dragonfly-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/dragonfly-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
        local archive_name="x86_64-unknown-dragonfly.tar.xz"
     elif [[ $target == openbsd ]]; then
        local toolchain_url="https://github.com/AmanoTeam/Atar/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
