@@ -724,7 +724,7 @@ generate_checksums() {
 
 # Build for a single architecture
 build_single_arch() {
-    unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD _zig_bsd
+    unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD _zig_bsd OUTPUT_FILE
 
     local target=$1
     local arch=$2
@@ -1141,6 +1141,10 @@ build_single_arch() {
        export OUTPUT_FILE="bash-${bash_version}-NetBSD-${arch}"
     elif [[ "$target" == "openbsd" ]]; then
        export OUTPUT_FILE="bash-${bash_version}-OpenBSD-${arch}"
+    else
+       echo -e "${RED}ERROR: Unknown target '${target}' — cannot determine output filename${NC}" >&2
+       popd # project root
+       return 1
     fi
 
     echo -e "${PURPLE}= Extracting bash ${bash_version} binary${NC}"
