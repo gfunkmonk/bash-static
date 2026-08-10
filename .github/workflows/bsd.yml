@@ -11,9 +11,9 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            netbsd_version: '11.0'
+            netbsd_version: '10.1'
           - arch: aarch64
-            netbsd_version: '11.0'
+            netbsd_version: '10.1'
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on NetBSD
