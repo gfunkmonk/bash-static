@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on NetBSD
-        uses: cross-platform-actions/action@v1.3.0
+        uses: cross-platform-actions/action@master
         with:
           operating_system: netbsd
           architecture: ${{ matrix.arch }}
@@ -54,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on FreeBSD
-        uses: cross-platform-actions/action@v1.3.0
+        uses: cross-platform-actions/action@master
         with:
           operating_system: freebsd
           architecture: ${{ matrix.arch }}
@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on OpenBSD
-        uses: cross-platform-actions/action@v1.3.0
+        uses: cross-platform-actions/action@master
         with:
           operating_system: openbsd
           architecture: ${{ matrix.arch }}
