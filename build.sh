@@ -1280,8 +1280,26 @@ build_single_arch() {
         if [[ "$expected_target" != "macos" ]]; then
             local static_ok=false
 
+            # OpenBSD cannot produce traditional static binaries — the linker always
+            # emits ET_DYN (PIE). --enable-static ensures no shared lib deps, but
+            # 'file' still reports "shared object". Skip the static check entirely
+            # for OpenBSD and rely on the no-(NEEDED)-entries check instead.
+            if [[ "$expected_target" == "openbsd" ]]; then
+                local re_dyn_ob
+                re_dyn_ob=$(readelf -d "$bin" 2>/dev/null) || true
+                if [[ $re_dyn_ob != *"(NEEDED)"* ]]; then
+                    echo -e "${YELLOW}  ~ Static check: OpenBSD PIE binary — no dynamic library deps (ET_DYN is normal on OpenBSD)${NC}"
+                    static_ok=true
+                else
+                    # Actually has (NEEDED) entries — real dynamic deps, that's a failure
+                    local needed_libs
+                    needed_libs=$(echo "$re_dyn_ob" | grep "(NEEDED)" || true)
+                    echo -e "${RED}  ✗ OpenBSD binary has unexpected dynamic library dependencies:${NC}" >&2
+                    echo -e "${RED}    ${needed_libs}${NC}" >&2
+                fi
+
             # 'file' reports "statically linked" for static ELF binaries
-            if [[ $file_out == *"statically linked"* ]]; then
+            elif [[ $file_out == *"statically linked"* ]]; then
                 static_ok=true
             else
                 # readelf -d dumps the dynamic section; a static binary has none
@@ -1302,30 +1320,9 @@ build_single_arch() {
                 if [[ $static_ok == false ]] && command -v ldd >/dev/null 2>&1; then
                     local ldd_out
                     ldd_out=$(ldd "$bin" 2>&1) || true
-                    if [[ $ldd_out == *"not a dynamic"*   ||
-                          $ldd_out == *"statically linked"* ||
+                    if [[ $ldd_out == *"not a dynamic"*        ||
+                          $ldd_out == *"statically linked"*    ||
                           $ldd_out == *"not a dynamic executable"* ]]; then
-                        static_ok=true
-                    fi
-                fi
-
-                # OpenBSD always builds PIE: --enable-static produces an ET_DYN ELF
-                # (file says "shared object") with no (NEEDED) entries — that IS the
-                # static result on OpenBSD. readelf -d catches it above when the
-                # dynamic section is absent or NEEDED-free, but if ldd or readelf
-                # aren't available / give ambiguous output, treat OpenBSD as passing
-                # since we already confirmed there are no NEEDED entries via the
-                # re_dyn check. Only fail if readelf explicitly found (NEEDED) libs.
-                if [[ $static_ok == false && "$expected_target" == "openbsd" ]]; then
-                    if command -v readelf >/dev/null 2>&1; then
-                        local re_dyn2
-                        re_dyn2=$(readelf -d "$bin" 2>/dev/null) || true
-                        if [[ $re_dyn2 != *"(NEEDED)"* ]]; then
-                            echo -e "${YELLOW}  ~ Static check: OpenBSD PIE binary — no dynamic deps found (ET_DYN is expected)${NC}"
-                            static_ok=true
-                        fi
-                    else
-                        echo -e "${YELLOW}  ~ Static check: OpenBSD PIE binary — cannot verify without readelf${NC}" >&2
                         static_ok=true
                     fi
                 fi

@@ -121,7 +121,7 @@ jobs:
           version: ${{ matrix.dragonflybsd_version }}
           shell: bash
           run: |
-            sudo pkg install -y autoconf gnupg curl
+            sudo pkg install -y autoconf gnupg curl ssh
             # Configure GPG to reach keyservers from inside the QEMU VM
             #mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
             #echo "keyserver hkps://keys.openpgp.org" > ~/.gnupg/gpg.conf
