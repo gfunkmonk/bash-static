@@ -126,7 +126,7 @@ jobs:
             #mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
             #echo "keyserver hkps://keys.openpgp.org" > ~/.gnupg/gpg.conf
             #echo "keyserver hkps://keyserver.ubuntu.com" >> ~/.gnupg/gpg.conf
-            ./build.sh dragonflybsd ${{ matrix.arch }} --nosig
+            ./build.sh dragonfly ${{ matrix.arch }} --nosig
       - name: rename artifact
         run: |
           cd releases
