@@ -1186,7 +1186,7 @@ build_single_arch() {
         local arch_ok=false
         case "$expected_arch" in
             x86_64)       [[ $file_out == *"x86-64"*     || $file_out == *"x86_64"*      ]] && arch_ok=true ;;
-            aarch64)      [[ $file_out == *"aarch64"*    || $file_out == *"ARM aarch64"* ]] && arch_ok=true ;;
+            aarch64)      [[ $file_out == *"aarch64"*    || $file_out == *"ARM aarch64"* || $file_out == *"arm64"* ]] && arch_ok=true ;;
             armv5)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
             armv6)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
             armv7)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
