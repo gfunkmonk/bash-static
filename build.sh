@@ -544,13 +544,13 @@ setup_musl_toolchain() {
     echo -e "${CANARY}= Downloading ${toolchain_name} toolchain${NC}"
 
     if [[ $target == netbsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Dakini/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/netbsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
        local archive_name="x86_64-unknown-netbsd.tar.xz"
     elif [[ $target == freebsd ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Loki/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/freebsd-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
        local archive_name="x86_64-unknown-freebsd.tar.xz"
     elif [[ $target == dragonfly ]]; then
-       local toolchain_url="https://github.com/AmanoTeam/Venti/releases/download/gcc-15/x86_64-unknown-linux-gnu.tar.xz"
+       local toolchain_url="https://github.com/AmanoTeam/dragonfly-gcc-cross/releases/download/gcc-16/x86_64-unknown-linux-musl.tar.xz"
        local archive_name="x86_64-unknown-dragonfly.tar.xz"
     elif [[ $target == openbsd ]]; then
        local toolchain_url="https://github.com/AmanoTeam/Atar/releases/download/gcc-16/x86_64-unknown-linux-gnu.tar.xz"
@@ -1162,6 +1162,188 @@ build_single_arch() {
         strip -S releases/"$OUTPUT_FILE" 2>/dev/null || true
     fi
     end_timer "strip"
+
+    # Validate the output binary — check architecture and (for Linux/BSD) static linkage
+    validate_binary() {
+        local bin=$1
+        local expected_target=$2
+        local expected_arch=$3
+        local errors=0
+
+        if ! command -v file >/dev/null 2>&1; then
+            echo -e "${YELLOW}WARNING: 'file' not found, skipping binary validation${NC}" >&2
+            return 0
+        fi
+
+        local file_out
+        file_out=$(file -b "$bin" 2>/dev/null)
+
+        echo -e "${SLATE}= Validating binary: ${bin##*/}${NC}"
+        echo -e "${SLATE}  file: ${file_out}${NC}"
+
+        # --- Architecture check ---
+        # Map build arch names to the strings 'file' reports
+        local arch_ok=false
+        case "$expected_arch" in
+            x86_64)       [[ $file_out == *"x86-64"*     || $file_out == *"x86_64"*      ]] && arch_ok=true ;;
+            aarch64)      [[ $file_out == *"aarch64"*    || $file_out == *"ARM aarch64"* ]] && arch_ok=true ;;
+            armv5)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
+            armv6)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
+            armv7)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
+            i386|i486|i586|i686) [[ $file_out == *"Intel 80386"* || $file_out == *"i386"* ]] && arch_ok=true ;;
+            mips)         [[ $file_out == *"MIPS"*       && $file_out != *"MIPS64"*      ]] && arch_ok=true ;;
+            mipsel)       [[ $file_out == *"MIPS"*       && $file_out == *"LSB"*         ]] && arch_ok=true ;;
+            mips64)       [[ $file_out == *"MIPS64"*     && $file_out != *"LSB"*         ]] && arch_ok=true ;;
+            mips64el)     [[ $file_out == *"MIPS64"*     && $file_out == *"LSB"*         ]] && arch_ok=true ;;
+            powerpc)      [[ $file_out == *"PowerPC"*    && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
+            powerpcle)    [[ $file_out == *"PowerPC"*    && $file_out == *"LSB"*         ]] && arch_ok=true ;;
+            powerpc64)    [[ $file_out == *"PowerPC"*    && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
+            powerpc64le)  [[ $file_out == *"64-bit PowerPC"* && $file_out == *"LSB"*    ]] && arch_ok=true ;;
+            riscv32)      [[ $file_out == *"RISC-V"*     && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
+            riscv64)      [[ $file_out == *"RISC-V"*     && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
+            s390x)        [[ $file_out == *"IBM S/390"*  || $file_out == *"s390"*        ]] && arch_ok=true ;;
+            m68k)         [[ $file_out == *"68020"*      || $file_out == *"m68k"*        ]] && arch_ok=true ;;
+            sh4)          [[ $file_out == *"Renesas SH"* || $file_out == *"SH4"*         ]] && arch_ok=true ;;
+            loongarch64)  [[ $file_out == *"LoongArch"*                                  ]] && arch_ok=true ;;
+            microblaze)   [[ $file_out == *"MicroBlaze"*                                 ]] && arch_ok=true ;;
+            or1k)         [[ $file_out == *"OpenRISC"*                                   ]] && arch_ok=true ;;
+            alpha)        [[ $file_out == *"Alpha"*                                      ]] && arch_ok=true ;;
+            hppa)         [[ $file_out == *"PA-RISC"*                                    ]] && arch_ok=true ;;
+            sparc64)      [[ $file_out == *"SPARC"*      && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
+            arm)          [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
+            *)            arch_ok=true ;;  # Unknown arch — skip check rather than false-fail
+        esac
+
+        if [[ $arch_ok == true ]]; then
+            echo -e "${GREEN}  ✓ Architecture: ${expected_arch}${NC}"
+        else
+            echo -e "${RED}  ✗ Architecture mismatch: expected ${expected_arch}, got: ${file_out}${NC}" >&2
+            (( errors++ ))
+        fi
+
+        # --- BSD OS identifier check ---
+        # ELF binaries for BSD targets carry an OS/ABI tag or a .note.tag section
+        # that 'file' includes in its output. Verify the binary was built for the
+        # right OS — catches a cross-compile that accidentally linked against the
+        # wrong sysroot (e.g. produced a Linux ELF instead of a FreeBSD one).
+        if [[ "$expected_target" == "freebsd" || "$expected_target" == "netbsd" ||
+              "$expected_target" == "openbsd" || "$expected_target" == "dragonfly" ]]; then
+
+            local bsd_os_ok=false
+            local expected_os_str=""
+
+            case "$expected_target" in
+                freebsd)   expected_os_str="FreeBSD"   ;;
+                netbsd)    expected_os_str="NetBSD"    ;;
+                openbsd)   expected_os_str="OpenBSD"   ;;
+                dragonfly) expected_os_str="DragonFly" ;;
+            esac
+
+            # Primary: 'file' output usually contains the OS tag
+            if [[ $file_out == *"$expected_os_str"* ]]; then
+                bsd_os_ok=true
+            else
+                # Secondary: readelf -n dumps .note sections which carry OS/ABI branding
+                # e.g. "OS/ABI: FreeBSD" or a NOTE named "FreeBSD"/"OpenBSD" etc.
+                if command -v readelf >/dev/null 2>&1; then
+                    local re_out
+                    re_out=$(readelf -n "$bin" 2>/dev/null; readelf -h "$bin" 2>/dev/null) || true
+                    if [[ $re_out == *"$expected_os_str"* ]]; then
+                        bsd_os_ok=true
+                    fi
+                fi
+
+                # Tertiary: objdump -f shows the file format string, e.g.
+                # "elf64-x86-64-freebsd" or "elf64-x86-64-netbsd"
+                if [[ $bsd_os_ok == false ]] && command -v objdump >/dev/null 2>&1; then
+                    local od_fmt
+                    od_fmt=$(objdump -f "$bin" 2>/dev/null | grep -i "file format" || true)
+                    if [[ ${od_fmt,,} == *"${expected_os_str,,}"* ]]; then
+                        bsd_os_ok=true
+                    fi
+                fi
+            fi
+
+            if [[ $bsd_os_ok == true ]]; then
+                echo -e "${GREEN}  ✓ OS tag: ${expected_os_str}${NC}"
+            else
+                echo -e "${RED}  ✗ OS tag mismatch: expected ${expected_os_str} marker in binary${NC}" >&2
+                echo -e "${RED}    file: ${file_out}${NC}" >&2
+                echo -e "${YELLOW}    (cross-compiled BSD binaries built with zig may lack an OS note — verify manually)${NC}" >&2
+                (( errors++ ))
+            fi
+        fi
+
+        # --- Static linkage check (Linux and BSD only, not macOS) ---
+        if [[ "$expected_target" != "macos" ]]; then
+            local static_ok=false
+
+            # 'file' reports "statically linked" for static ELF binaries
+            if [[ $file_out == *"statically linked"* ]]; then
+                static_ok=true
+            else
+                # readelf -d dumps the dynamic section; a static binary has none
+                # This is more reliable than 'file' for cross-compiled BSDs
+                if command -v readelf >/dev/null 2>&1; then
+                    local re_dyn
+                    re_dyn=$(readelf -d "$bin" 2>/dev/null) || true
+                    if [[ -z "$re_dyn" || $re_dyn == *"no dynamic section"* ||
+                          $re_dyn == *"There is no dynamic section"* ]]; then
+                        static_ok=true
+                    elif [[ $re_dyn != *"(NEEDED)"* ]]; then
+                        # Dynamic section exists but has no library dependencies
+                        static_ok=true
+                    fi
+                fi
+
+                # Fall back to ldd if readelf didn't resolve it
+                if [[ $static_ok == false ]] && command -v ldd >/dev/null 2>&1; then
+                    local ldd_out
+                    ldd_out=$(ldd "$bin" 2>&1) || true
+                    if [[ $ldd_out == *"not a dynamic"* || $ldd_out == *"statically linked"* ]]; then
+                        static_ok=true
+                    fi
+                fi
+
+                # OpenBSD cross-builds via zig use -Wl,-Bstatic and --enable-static
+                # but the ELF may still show a dynamic section header with no entries;
+                # readelf above handles that. If we still can't confirm, warn only.
+                if [[ $static_ok == false ]]; then
+                    if [[ "$expected_target" == "openbsd" && -n ${_zig_bsd:-} ]]; then
+                        echo -e "${YELLOW}  ? Static check: zig/OpenBSD cross-build — verify dynamic deps manually${NC}" >&2
+                        static_ok=true  # Non-fatal: zig OpenBSD is best-effort static
+                    else
+                        # No tool confirmed static — treat as failure
+                        static_ok=false
+                    fi
+                fi
+            fi
+
+            if [[ $static_ok == true ]]; then
+                echo -e "${GREEN}  ✓ Statically linked${NC}"
+            else
+                echo -e "${RED}  ✗ Binary does not appear to be statically linked${NC}" >&2
+                echo -e "${RED}    file: ${file_out}${NC}" >&2
+                (( errors++ ))
+            fi
+        else
+            echo -e "${PLUM}  ~ Static check: skipped (macOS does not support fully static binaries)${NC}"
+        fi
+
+        if (( errors > 0 )); then
+            echo -e "${CRIMSON}= Validation FAILED for ${bin##*/} (${errors} error(s))${NC}" >&2
+            return 1
+        fi
+
+        echo -e "${AQUA}= Validation passed for ${bin##*/}${NC}"
+        return 0
+    }
+
+    validate_binary "releases/$OUTPUT_FILE" "$target" "$arch" || {
+        echo -e "${CRIMSON}ERROR: Output binary failed validation — aborting${NC}" >&2
+        popd # project root
+        return 1
+    }
 
     # Clean up build directory unless KEEP_BUILD is set
     if [[ ! ${KEEP_BUILD:-} ]]; then
