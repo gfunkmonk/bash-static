@@ -11,15 +11,16 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            netbsd_version: '10.1'
+            netbsd_version: '11.0'
           - arch: aarch64
-            netbsd_version: '10.1'
+            netbsd_version: '11.0'
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on NetBSD
         uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: netbsd
+          architecture: ${{ matrix.arch }}
           version: ${{ matrix.netbsd_version }}
           shell: bash
           run: |
@@ -56,6 +57,7 @@ jobs:
         uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: freebsd
+          architecture: ${{ matrix.arch }}
           version: ${{ matrix.freebsd_version }}
           shell: bash
           run: |
@@ -91,6 +93,7 @@ jobs:
         uses: cross-platform-actions/action@v1.3.0
         with:
           operating_system: openbsd
+          architecture: ${{ matrix.arch }}
           version: ${{ matrix.openbsd_version }}
           shell: bash
           run: |
