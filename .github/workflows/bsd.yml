@@ -11,7 +11,9 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            netbsd_version: '10.1'
+            netbsd_version: '11.0'
+          - arch: aarch64
+            netbsd_version: '11.0'
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on NetBSD
@@ -46,6 +48,8 @@ jobs:
         include:
           - arch: x86_64
             freebsd_version: '15.1'
+          - arch: aarch64
+            freebsd_version: '15.1'
     steps:
       - uses: actions/checkout@v7
       - name: Build bash natively on FreeBSD
@@ -78,6 +82,8 @@ jobs:
       matrix:
         include:
           - arch: x86_64
+            openbsd_version: '7.9'
+          - arch: aarch64
             openbsd_version: '7.9'
     steps:
       - uses: actions/checkout@v7
