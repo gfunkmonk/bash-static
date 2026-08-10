@@ -1187,9 +1187,10 @@ build_single_arch() {
         case "$expected_arch" in
             x86_64)       [[ $file_out == *"x86-64"*     || $file_out == *"x86_64"*      ]] && arch_ok=true ;;
             aarch64)      [[ $file_out == *"aarch64"*    || $file_out == *"ARM aarch64"* || $file_out == *"arm64"* ]] && arch_ok=true ;;
-            armv5)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
-            armv6)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
-            armv7)        [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
+            arm)          [[ $file_out == *"ARM"*   && $file_out != *"64-bit"*           ]] && arch_ok=true ;;
+            armv5)        [[ $file_out == *"ARM"*   && $file_out != *"64-bit"*           ]] && arch_ok=true ;;
+            armv6)        [[ $file_out == *"ARM"*   && $file_out != *"64-bit"*           ]] && arch_ok=true ;;
+            armv7)        [[ $file_out == *"ARM"*   && $file_out != *"64-bit"*           ]] && arch_ok=true ;;
             i386|i486|i586|i686) [[ $file_out == *"Intel 80386"* || $file_out == *"i386"* ]] && arch_ok=true ;;
             mips)         [[ $file_out == *"MIPS"*  && $file_out != *"64-bit"* && $file_out != *"MIPS64"* && $file_out != *"MIPS-III"* && $file_out != *"MIPS-IV"* && $file_out == *"MSB"* ]] && arch_ok=true ;;
             mipsel)       [[ $file_out == *"MIPS"*  && $file_out != *"64-bit"* && $file_out != *"MIPS64"* && $file_out != *"MIPS-III"* && $file_out != *"MIPS-IV"* && $file_out == *"LSB"* ]] && arch_ok=true ;;
@@ -1197,20 +1198,19 @@ build_single_arch() {
             mips64el)     [[ $file_out == *"MIPS"*  && $file_out == *"64-bit"* && ($file_out == *"MIPS64"* || $file_out == *"MIPS-III"* || $file_out == *"MIPS-IV"*) && $file_out == *"LSB"* ]] && arch_ok=true ;;
             powerpc)      [[ $file_out == *"PowerPC"*    && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
             powerpcle)    [[ $file_out == *"PowerPC"*    && $file_out == *"LSB"*         ]] && arch_ok=true ;;
-            powerpc64)    [[ $file_out == *"PowerPC"*    && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
-            powerpc64le)  [[ $file_out == *"64-bit PowerPC"* && $file_out == *"LSB"*    ]] && arch_ok=true ;;
+            powerpc64)    [[ $file_out == *"64-bit PowerPC"* && $file_out == *"64-bit"*  ]] && arch_ok=true ;;
+            powerpc64le)  [[ $file_out == *"64-bit PowerPC"* && $file_out == *"LSB"*     ]] && arch_ok=true ;;
             riscv32)      [[ $file_out == *"RISC-V"*     && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
             riscv64)      [[ $file_out == *"RISC-V"*     && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
-            s390x)        [[ $file_out == *"IBM S/390"*  || $file_out == *"s390"*        ]] && arch_ok=true ;;
-            m68k)         [[ $file_out == *"68020"*      || $file_out == *"m68k"*        ]] && arch_ok=true ;;
-            sh4)          [[ $file_out == *"Renesas SH"* || $file_out == *"SH4"*         ]] && arch_ok=true ;;
-            loongarch64)  [[ $file_out == *"LoongArch"*                                  ]] && arch_ok=true ;;
+            s390x)        [[ $file_out == *"IBM S/390"*  && $file_out == *"64-bit"*        ]] && arch_ok=true ;;
+            m68k)         [[ $file_out == *"Motorola m68k"* || $file_out == *"68020"*    ]] && arch_ok=true ;;
+            sh4)          [[ $file_out == *"Renesas SH"* && $file_out != *"64-bit"*      ]] && arch_ok=true ;;
+            loongarch64)  [[ $file_out == *"LoongArch"*	 && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
             microblaze)   [[ $file_out == *"MicroBlaze"*                                 ]] && arch_ok=true ;;
             or1k)         [[ $file_out == *"OpenRISC"*                                   ]] && arch_ok=true ;;
             alpha)        [[ $file_out == *"Alpha"*                                      ]] && arch_ok=true ;;
             hppa)         [[ $file_out == *"PA-RISC"*                                    ]] && arch_ok=true ;;
             sparc64)      [[ $file_out == *"SPARC"*      && $file_out == *"64-bit"*      ]] && arch_ok=true ;;
-            arm)          [[ $file_out == *"ARM"*                                         ]] && arch_ok=true ;;
             *)            arch_ok=true ;;  # Unknown arch — skip check rather than false-fail
         esac
 
@@ -1227,7 +1227,8 @@ build_single_arch() {
         # right OS — catches a cross-compile that accidentally linked against the
         # wrong sysroot (e.g. produced a Linux ELF instead of a FreeBSD one).
         if [[ "$expected_target" == "freebsd" || "$expected_target" == "netbsd" ||
-              "$expected_target" == "openbsd" || "$expected_target" == "dragonfly" ]]; then
+              "$expected_target" == "openbsd" || "$expected_target" == "dragonfly" || 
+              "$expected_target" == "macos" ]]; then
 
             local bsd_os_ok=false
             local expected_os_str=""
@@ -1237,6 +1238,7 @@ build_single_arch() {
                 netbsd)    expected_os_str="NetBSD"    ;;
                 openbsd)   expected_os_str="OpenBSD"   ;;
                 dragonfly) expected_os_str="DragonFly" ;;
+				macos) expected_os_str="Mach-O"        ;;
             esac
 
             # Primary: 'file' output usually contains the OS tag
