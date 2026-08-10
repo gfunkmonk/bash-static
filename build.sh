@@ -1236,7 +1236,7 @@ build_single_arch() {
         # right OS — catches a cross-compile that accidentally linked against the
         # wrong sysroot (e.g. produced a Linux ELF instead of a FreeBSD one).
         if [[ "$expected_target" == "freebsd" || "$expected_target" == "netbsd" ||
-              "$expected_target" == "openbsd" || "$expected_target" == "dragonfly" || 
+              "$expected_target" == "openbsd" || "$expected_target" == "dragonfly" ||
               "$expected_target" == "macos" ]]; then
 
             local bsd_os_ok=false
@@ -1247,7 +1247,7 @@ build_single_arch() {
                 netbsd)    expected_os_str="NetBSD"    ;;
                 openbsd)   expected_os_str="OpenBSD"   ;;
                 dragonfly) expected_os_str="DragonFly" ;;
-				macos) expected_os_str="Mach-O"        ;;
+		macos) expected_os_str="Mach-O"        ;;
             esac
 
             # Primary: 'file' output usually contains the OS tag
