@@ -722,6 +722,36 @@ generate_checksums() {
     popd
 }
 
+# Apply every selected official patch before configuring or compiling Bash.
+apply_official_bash_patches() {
+    local version=$1
+    local patch_level=$2
+    shift 2
+    local lvl patch_name mirror downloaded
+
+    for ((lvl = 1; lvl <= patch_level; lvl++)); do
+        printf -v patch_name 'bash%s-%03d' "${version/\./}" "$lvl"
+        downloaded=false
+        for mirror in "$@"; do
+            if mycurl "${mirror}/bash-${version}-patches/${patch_name}" sig; then
+                downloaded=true
+                break
+            fi
+            echo -e "${YELLOW}Failed to download patch from $mirror, trying next...${NC}"
+        done
+
+        if [[ $downloaded == false ]]; then
+            echo -e "${RED}ERROR: Failed to download patch ${patch_name} from all mirrors${NC}" >&2
+            return 1
+        fi
+
+        if ! (cd "bash-${version}" && patch --batch --forward -sp0 <../"${patch_name}"); then
+            echo -e "${RED}ERROR: Failed to apply patch ${patch_name}${NC}" >&2
+            return 1
+        fi
+    done
+}
+
 # Build for a single architecture
 build_single_arch() {
     unset CC CXX AR RANLIB CFLAGS CXXFLAGS LDFLAGS CPPFLAGS STRIPCMD _zig_bsd OUTPUT_FILE
@@ -816,30 +846,11 @@ build_single_arch() {
     start_timer "patch_bash"
     if [[ ${bash_patch_level:-0} -gt 0 ]]; then
         echo -e "${CYAN}= Patching bash ${bash_version} | patches: ${bash_patch_level}${NC}"
-        for ((lvl = 1; lvl <= bash_patch_level; lvl++)); do
-            printf -v bash_patch 'bash%s-%03d' "${bash_version/\./}" "${lvl}"
-
-            # Try downloading patch from mirrors
-            patch_downloaded=false
-            for mirror in "${bash_mirrors[@]}"; do
-                if mycurl "${mirror}/bash-${bash_version}-patches/${bash_patch}" sig; then
-                    patch_downloaded=true
-                    break
-                fi
-                echo -e "${YELLOW}Failed to download patch from $mirror, trying next...${NC}"
-            done
-
-            if [[ $patch_downloaded == false ]]; then
-                echo -e "${RED}WARNING: Failed to download patch ${bash_patch} from all mirrors${NC}" >&2
-                continue
-            fi
-
-            pushd bash-"${bash_version}"
-            patch -sp0 <../"${bash_patch}" || {
-                echo -e "${RED}WARNING: Failed to apply patch ${bash_patch}${NC}" >&2
-            }
-            popd
-        done
+        if ! apply_official_bash_patches "$bash_version" "$bash_patch_level" "${bash_mirrors[@]}"; then
+            popd # build
+            popd # project root
+            return 1
+        fi
     fi
 
     echo -e "\n"
@@ -1625,6 +1636,9 @@ main() {
             generate_checksums "releases"
         fi
 
+        if [[ ${#failed_builds[@]} -gt 0 ]]; then
+            exit 1
+        fi
         exit 0
     fi
 
